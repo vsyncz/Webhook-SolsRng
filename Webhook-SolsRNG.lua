@@ -1,13 +1,13 @@
 --[[
     Script: Webhook Biome Notifier
     Author: MuiHub (UI & Features by Gemini)
-    Version: 2.3
+    Version: 2.4
     
     Deskripsi:
     UI yang disempurnakan untuk notifikasi biome.
+    - Menambahkan padding pada kotak input webhook agar teks tidak tumpang tindih.
     - Implementasi logika geser (drag) yang sangat halus dan andal.
     - Perbaikan bug tampilan saat UI di-minimize.
-    - Tombol Minimize untuk menyembunyikan/menampilkan UI.
 ]]
 
 --================================================================================
@@ -55,7 +55,7 @@ Header.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 Header.Size = UDim2.new(1, 0, 0, 30)
 Header.Active = true -- Penting untuk menangkap input
 
--- PERBAIKAN: Logika Geser (Drag) yang Sangat Halus
+-- Logika Geser (Drag) yang Sangat Halus
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local dragging = false
@@ -134,7 +134,7 @@ BodyContainer.BackgroundTransparency = 1
 BodyContainer.Position = UDim2.new(0, 0, 0, 30)
 BodyContainer.Size = UDim2.new(1, 0, 1, -30)
 
--- PERBAIKAN: Logika untuk tombol minimize
+-- Logika untuk tombol minimize
 local isMinimized = false
 MinimizeButton.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
@@ -244,9 +244,17 @@ webhookUrlBox.Size = UDim2.new(1, 0, 0, 30)
 webhookUrlBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 webhookUrlBox.TextColor3 = Color3.fromRGB(220, 220, 220)
 webhookUrlBox.Font = Enum.Font.SourceSans
-webhookUrlBox.Text = "" -- Perbaikan: Pastikan teks awal kosong
+webhookUrlBox.Text = ""
 webhookUrlBox.PlaceholderText = "Tempel URL webhook Anda di sini"
 webhookUrlBox.ClearTextOnFocus = false
+webhookUrlBox.TextXAlignment = Enum.TextXAlignment.Left -- Jaga teks tetap di kiri
+
+-- PERBAIKAN: Menambahkan padding agar teks tidak tumpang tindih
+local textPadding = Instance.new("UIPadding")
+textPadding.Parent = webhookUrlBox
+textPadding.PaddingLeft = UDim.new(0, 8)
+textPadding.PaddingRight = UDim.new(0, 8)
+
 
 -- 2. Daftar Centang Biome
 local biomeTitleLabel = Instance.new("TextLabel")
