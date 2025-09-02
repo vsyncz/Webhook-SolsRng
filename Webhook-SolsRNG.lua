@@ -1,13 +1,13 @@
 --[[
     Script: Webhook Biome Notifier
     Author: MuiHub (UI & Features by Gemini)
-    Version: 2.6
+    Version: 2.7
     
     Deskripsi:
     UI yang disempurnakan untuk notifikasi biome.
-    - Menambahkan tombol "Test" untuk diagnosa koneksi webhook.
-    - Menambahkan URL webhook sementara sebagai default untuk kemudahan testing.
-    - Fungsionalitas "Apply" untuk menyimpan URL webhook.
+    - Webhook sementara kini menjadi default dan aktif secara otomatis.
+    - Pengguna dapat menggantinya dengan webhook kustom (opsional) menggunakan tombol "Apply".
+    - Tombol "Test" untuk diagnosa koneksi webhook yang sedang aktif.
 ]]
 
 --================================================================================
@@ -21,7 +21,8 @@ end
 
 -- Inisialisasi variabel dan daftar biome
 local webhookUrlBox
-local appliedWebhookURL = "" -- Variabel untuk menyimpan URL yang sudah di-apply
+local defaultWebhookURL = "https://discord.com/api/webhooks/1412511244388405329/fBrCX0p9GfUypT1PnBaA2wK8CkO8JzjUODN8FA8bjhPrmbimSsbyCrzgSAIGoeQi1kJ4"
+local appliedWebhookURL = defaultWebhookURL -- Langsung aktifkan webhook default
 
 local availableBiomes = {
     "Windy", "BlazingSun", "Snowy", "Rainy", "Null", 
@@ -45,7 +46,8 @@ MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 MainFrame.BorderColor3 = Color3.fromRGB(80, 80, 80)
 MainFrame.BorderSizePixel = 1
-MainFrame.Position = UDim2.new(0, 420, 0, 350)
+MainFrame.Position = UDim2.new(0.5, -210, 0.5, -175)
+MainFrame.Size = UDim2.new(0, 420, 0, 350)
 MainFrame.ClipsDescendants = true
 
 -- Header untuk judul dan tombol kontrol
@@ -233,7 +235,7 @@ webhookInputLabel.Size = UDim2.new(1, 0, 0, 20)
 webhookInputLabel.BackgroundTransparency = 1
 webhookInputLabel.Font = Enum.Font.SourceSans
 webhookInputLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-webhookInputLabel.Text = "URL Webhook Discord:"
+webhookInputLabel.Text = "URL Webhook Kustom (Opsional):"
 webhookInputLabel.TextSize = 14
 webhookInputLabel.TextXAlignment = Enum.TextXAlignment.Left
 
@@ -258,8 +260,8 @@ webhookUrlBox.Size = UDim2.new(1, -135, 1, 0) -- Beri ruang untuk 2 tombol
 webhookUrlBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 webhookUrlBox.TextColor3 = Color3.fromRGB(220, 220, 220)
 webhookUrlBox.Font = Enum.Font.SourceSans
-webhookUrlBox.Text = "https://discord.com/api/webhooks/1412511244388405329/fBrCX0p9GfUypT1PnBaA2wK8CkO8JzjUODN8FA8bjhPrmbimSsbyCrzgSAIGoeQi1kJ4" -- Webhook Test Default
-webhookUrlBox.PlaceholderText = "Tempel URL webhook Anda di sini"
+webhookUrlBox.Text = ""
+webhookUrlBox.PlaceholderText = "Ganti webhook default di sini"
 webhookUrlBox.ClearTextOnFocus = false
 webhookUrlBox.TextXAlignment = Enum.TextXAlignment.Left
 
@@ -292,21 +294,29 @@ TestButton.TextSize = 14
 
 ApplyButton.MouseButton1Click:Connect(function()
     local url = webhookUrlBox.Text
+    local originalColor = ApplyButton.BackgroundColor3
+    
+    -- Jika memasukkan URL valid
     if url:match("^https://discord.com/api/webhooks/") then
         appliedWebhookURL = url
-        local originalColor = ApplyButton.BackgroundColor3
         ApplyButton.Text = "Applied ✓"
         ApplyButton.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
         task.wait(2)
-        ApplyButton.Text = "Apply"
-        ApplyButton.BackgroundColor3 = originalColor
+    -- Jika kotak dikosongkan, kembali ke default
+    elseif url == "" then
+        appliedWebhookURL = defaultWebhookURL
+        ApplyButton.Text = "Defaulted"
+        ApplyButton.BackgroundColor3 = Color3.fromRGB(70, 130, 255)
+        task.wait(2)
+    -- Jika URL tidak valid
     else
-        appliedWebhookURL = "" -- Kosongkan jika tidak valid
-        local originalColor = ApplyButton.BackgroundColor3
+        ApplyButton.Text = "Invalid"
         ApplyButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        task.wait(1)
-        ApplyButton.BackgroundColor3 = originalColor
+        task.wait(2)
     end
+    
+    ApplyButton.Text = "Apply"
+    ApplyButton.BackgroundColor3 = originalColor
 end)
 
 -- 2. Daftar Centang Biome
@@ -386,9 +396,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Event = ReplicatedStorage.ReplicaRemoteEvents.Replica_ReplicaSetValue
 
 function SendMessageEMBED(embed)
-    -- Gunakan URL yang sudah di-apply
+    -- Gunakan URL yang sudah di-apply (baik default maupun kustom)
     if not appliedWebhookURL:match("^https://discord.com/api/webhooks/") then
-        print("MuiHub: URL Webhook tidak valid atau belum di-apply. Notifikasi dibatalkan.")
+        print("MuiHub: Tidak ada URL Webhook yang valid. Notifikasi dibatalkan.")
         return false
     end
 
@@ -415,7 +425,7 @@ function SendMessageEMBED(embed)
         print("MuiHub: Notifikasi embed berhasil dikirim ke Discord!")
         return true
     else
-        print("MuiHub: Gagal mengirim notifikasi embed. Cek kembali URL webhook Anda.")
+        print("MuiHub: Gagal mengirim notifikasi embed. Cek kembali URL webhook Anda atau koneksi internet.")
         return false
     end
 end
@@ -423,7 +433,7 @@ end
 TestButton.MouseButton1Click:Connect(function()
     local testEmbed = {
         title = "Pesan Uji Coba dari MuiHub",
-        description = "Jika Anda melihat pesan ini, artinya webhook Anda berfungsi dengan benar!",
+        description = "Jika Anda melihat pesan ini, artinya webhook yang sedang aktif (" .. (appliedWebhookURL == defaultWebhookURL and "Default" or "Kustom") .. ") berfungsi dengan benar!",
         color = 8311585, -- Hijau
         footer = { text = "MuiHub Notifier | Test Message" }
     }
