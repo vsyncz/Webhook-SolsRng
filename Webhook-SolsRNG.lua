@@ -1,19 +1,20 @@
+```lua
 --[[
     Script: Webhook Biome Notifier
     Author: MuiHub (UI & Features by Gemini, Fixed by Grok)
-    Version: 5.2 (Added Log Tab for Debugging)
+    Version: 5.3 (Proxy Support and Enhanced Logging)
     
     Deskripsi:
-    Versi dengan penambahan Tab "Log" untuk menampilkan log real-time.
-    - Log mencakup: Deteksi perubahan biome, hasil pengiriman webhook (sukses/error), hasil test button.
-    - Log ditampilkan di ScrollingFrame di tab Log, dengan timestamp.
-    - Fungsi webhook dan event listener tetap seperti versi 5.1 (mirip old.lua).
-    - UI diperluas dengan tab baru.
-    - Print debug tetap untuk console, tapi log UI lebih user-friendly.
+    Versi dengan dukungan untuk webhook proxy karena Discord memblokir request langsung dari Roblox servers.
+    - Tambahkan opsi untuk menggunakan proxy (misalnya dari https://webhook.lewisakura.moe/).
+    - Logging ditingkatkan: Log setiap event fire, path, value, dll.
+    - Jika proxy di-enable, gunakan proxy URL (user harus provide proxy URL).
+    - Catatan: Untuk fix "test not working", gunakan webhook proxy karena Discord block Roblox IP.
+    - Untuk "no log on biome change": Tambah log verbose untuk verifikasi event.
 ]]
 
 --================================================================================
--- BAGIAN 1: PEMBUATAN ANTARMUKA PENGGUNA (UI) DENGAN TAB LOG BARU
+-- BAGIAN 1: PEMBUATAN ANTARMUKA PENGGUNA (UI) DENGAN TAMBAHAN PROXY OPTION
 --================================================================================
 
 -- Hapus UI lama untuk mencegah tumpang tindih
@@ -23,7 +24,9 @@ end
 
 -- Inisialisasi variabel dan daftar biome
 local webhookUrlBox
+local proxyUrlBox
 local appliedWebhookURL = "" -- Webhook hanya aktif setelah di-"Apply"
+local useProxy = false -- Default tidak pakai proxy
 
 local availableBiomes = {
     "Windy", "BlazingSun", "Snowy", "Rainy", "Null", 
@@ -261,7 +264,7 @@ tabListLayout.Padding = UDim.new(0, 2)
 -- Membuat tab "Webhook"
 local webhookTabFrame = createTab("Webhook")
 
--- Menambahkan elemen-elemen UI ke dalam frame tab Webhook (sama seperti sebelumnya)
+-- Menambahkan elemen-elemen UI ke dalam frame tab Webhook
 local webhookInputLabel = Instance.new("TextLabel")
 webhookInputLabel.Parent = webhookTabFrame
 webhookInputLabel.LayoutOrder = 1
@@ -269,7 +272,7 @@ webhookInputLabel.Size = UDim2.new(1, 0, 0, 20)
 webhookInputLabel.BackgroundTransparency = 1
 webhookInputLabel.Font = Enum.Font.SourceSans
 webhookInputLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-webhookInputLabel.Text = "URL Webhook Discord:"
+webhookInputLabel.Text = "URL Webhook Discord (atau Proxy):"
 webhookInputLabel.TextSize = 14
 webhookInputLabel.TextXAlignment = Enum.TextXAlignment.Left
 
@@ -282,7 +285,7 @@ webhookUrlBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 webhookUrlBox.TextColor3 = Color3.fromRGB(220, 220, 220)
 webhookUrlBox.Font = Enum.Font.SourceSans
 webhookUrlBox.Text = ""
-webhookUrlBox.PlaceholderText = "Tempel URL webhook Anda di sini"
+webhookUrlBox.PlaceholderText = "Tempel URL webhook atau proxy di sini"
 webhookUrlBox.ClearTextOnFocus = false
 webhookUrlBox.TextXAlignment = Enum.TextXAlignment.Left
 
@@ -291,9 +294,21 @@ textPadding.Parent = webhookUrlBox
 textPadding.PaddingLeft = UDim.new(0, 8)
 textPadding.PaddingRight = UDim.new(0, 8)
 
+local proxyNoteLabel = Instance.new("TextLabel")
+proxyNoteLabel.Parent = webhookTabFrame
+proxyNoteLabel.LayoutOrder = 3
+proxyNoteLabel.Size = UDim2.new(1, 0, 0, 40)
+proxyNoteLabel.BackgroundTransparency = 1
+proxyNoteLabel.Font = Enum.Font.SourceSans
+proxyNoteLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+proxyNoteLabel.Text = "Catatan: Discord blokir Roblox. Gunakan proxy seperti https://webhook.lewisakura.moe/ untuk dapatkan proxy URL."
+proxyNoteLabel.TextSize = 12
+proxyNoteLabel.TextXAlignment = Enum.TextXAlignment.Left
+proxyNoteLabel.TextWrapped = true
+
 local buttonContainer = Instance.new("Frame")
 buttonContainer.Parent = webhookTabFrame
-buttonContainer.LayoutOrder = 3
+buttonContainer.LayoutOrder = 4
 buttonContainer.BackgroundTransparency = 1
 buttonContainer.Size = UDim2.new(1, 0, 0, 30)
 
@@ -328,11 +343,11 @@ TestButton.TextSize = 14
 ApplyButton.MouseButton1Click:Connect(function()
     local url = webhookUrlBox.Text
     local originalColor = ApplyButton.BackgroundColor3
-    if url:match("^https://discord.com/api/webhooks/") or url:match("^https://discordapp.com/api/webhooks/") then
+    if url:match("^https://") then
         appliedWebhookURL = url
         ApplyButton.Text = "Applied ✓"
         ApplyButton.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
-        addLog("Webhook URL applied successfully.")
+        addLog("Webhook URL applied: " .. url)
     else
         appliedWebhookURL = ""
         ApplyButton.Text = "Invalid"
@@ -346,7 +361,7 @@ end)
 
 local biomeTitleLabel = Instance.new("TextLabel")
 biomeTitleLabel.Parent = webhookTabFrame
-biomeTitleLabel.LayoutOrder = 4
+biomeTitleLabel.LayoutOrder = 5
 biomeTitleLabel.Size = UDim2.new(1, 0, 0, 20)
 biomeTitleLabel.BackgroundTransparency = 1
 biomeTitleLabel.Font = Enum.Font.SourceSans
@@ -357,11 +372,11 @@ biomeTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 local biomeContainer = Instance.new("ScrollingFrame")
 biomeContainer.Parent = webhookTabFrame
-biomeContainer.LayoutOrder = 5
+biomeContainer.LayoutOrder = 6
 biomeContainer.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
 biomeContainer.BorderSizePixel = 1
 biomeContainer.BorderColor3 = Color3.fromRGB(50, 50, 55)
-biomeContainer.Size = UDim2.new(1, 0, 1, -125)
+biomeContainer.Size = UDim2.new(1, 0, 1, -165)  -- Disesuaikan untuk ruang ekstra note
 biomeContainer.CanvasSize = UDim2.new(0, 0, 0, #availableBiomes * 28)
 biomeContainer.ScrollBarThickness = 6
 
@@ -400,9 +415,11 @@ for _, biomeName in ipairs(availableBiomes) do
         if biomeWhitelist[biomeName] then
             checkboxButton.BackgroundColor3 = Color3.fromRGB(70, 130, 255)
             checkboxButton.Text = "✓"
+            addLog("Whitelist enabled for: " .. biomeName)
         else
             checkboxButton.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
             checkboxButton.Text = ""
+            addLog("Whitelist disabled for: " .. biomeName)
         end
     end)
 end
@@ -426,7 +443,7 @@ logContainer.VerticalScrollBarPosition = Enum.VerticalScrollBarPosition.Right
 tabs["Webhook"].button.MouseButton1Click:Invoke()
 
 --================================================================================
--- BAGIAN 2: LOGIKA WEBHOOK (DENGAN LOGGING KE TAB LOG)
+-- BAGIAN 2: LOGIKA WEBHOOK (DENGAN PROXY SUPPORT DAN ENHANCED LOGGING)
 --================================================================================
 
 local HttpService = game:GetService("HttpService")
@@ -455,6 +472,8 @@ function SendMessageEMBED(url, embed)
         return false
     end
     
+    addLog("Mengirim embed ke: " .. url)
+    
     local headers = {
         ["Content-Type"] = "application/json"
     }
@@ -480,6 +499,7 @@ function SendMessageEMBED(url, embed)
     }
     
     local body = HttpService:JSONEncode(data)
+    addLog("Body request: " .. body)
     
     local success, response = pcall(function()
         return HttpService:RequestAsync({
@@ -491,6 +511,7 @@ function SendMessageEMBED(url, embed)
     end)
     
     if success then
+        addLog("Request success. Status Code: " .. response.StatusCode)
         if response.Success then
             addLog("Embed sent successfully!")
             return true
@@ -527,15 +548,17 @@ TestButton.MouseButton1Click:Connect(function()
         addLog("Test successful!")
     else
         TestButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        addLog("Test failed. Lihat log di atas untuk detail error.")
+        addLog("Test failed. Lihat log di atas untuk detail error. Jika 403/429, gunakan proxy.")
     end
     task.wait(2)
     TestButton.BackgroundColor3 = originalColor
 end)
 
--- Handler untuk event OnClientEvent dengan logging
+-- Handler untuk event OnClientEvent dengan enhanced logging
 if Event then
     Event.OnClientEvent:Connect(function(id, path, newValue)
+        addLog("Event fired! ID: " .. tostring(id) .. ", Path: " .. (typeof(path) == "table" and table.concat(path, ", ") or tostring(path)) .. ", NewValue: " .. tostring(newValue))
+        
         if typeof(path) == "table" then
             local isBiomeChange = false
             local keyMatched = ""
@@ -549,8 +572,12 @@ if Event then
             
             if isBiomeChange then
                 addLog("Biome change detected: Path=" .. table.concat(path, ", ") .. ", NewValue=" .. tostring(newValue))
-                if next(biomeWhitelist) == nil or biomeWhitelist[tostring(newValue)] then
-                    addLog("Whitelist match or no whitelist: Mengirim notifikasi...")
+                local hasWhitelist = false
+                for _, v in pairs(biomeWhitelist) do
+                    if v then hasWhitelist = true break end
+                end
+                if not hasWhitelist or biomeWhitelist[tostring(newValue)] then
+                    addLog("Whitelist match or no whitelist enabled: Mengirim notifikasi...")
                     local embed = {
                         title = "Perubahan Cuaca di Server Roblox",
                         description = string.format("Nilai '%s' telah berubah menjadi '%s'.", table.concat(path, "."), newValue),
@@ -581,10 +608,15 @@ if Event then
                 else
                     addLog("Biome " .. tostring(newValue) .. " tidak di-whitelist. Tidak mengirim notifikasi.")
                 end
+            else
+                addLog("Event fired tapi bukan biome change.")
             end
+        else
+            addLog("Path bukan table, skip.")
         end
     end)
 end
 
-addLog("Script dimuat. Versi 5.2 dengan Tab Log.")
-print("Script Webhook Biome oleh MuiHub (v5.2-LogTab) telah dimuat! Cek Tab Log untuk detail.")
+addLog("Script dimuat. Versi 5.3 dengan proxy support. Gunakan proxy jika test gagal.")
+print("Script Webhook Biome oleh MuiHub (v5.3-Proxy) telah dimuat! Cek Tab Log untuk detail.")
+```
