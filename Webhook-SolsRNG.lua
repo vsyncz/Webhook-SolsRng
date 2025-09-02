@@ -1,24 +1,22 @@
 --[[
-    Script: Webhook Biome Notifier (Executor Safe Full)
-    Author: MuiHub + Fix by ChatGPT
-    Version: 5.2 (Safe for Executors)
+    Script: Webhook Biome Notifier (Fixed Version)
+    Author: MuiHub (UI & Features by Gemini, Fix by ChatGPT)
+    Version: 5.1 (Final Fixed)
 
-    Perubahan:
-    - GUI diparent ke (gethui() or CoreGui) supaya aman di Delta/ArceusX.
-    - Log tambahan untuk debug UI dan Webhook.
-    - Semua fitur UI (Apply, Test, whitelist biome) tetap ada.
+    Deskripsi:
+    Versi perbaikan dari webhook-final.lua agar semua fungsi berjalan seperti webhook old.lua.
+    - Embed Discord sesuai format lama (stabil).
+    - Path menggunakan table.concat agar aman.
+    - Whitelist biome opsional (jika kosong → kirim semua).
+    - UI tetap modern seperti final.lua.
 ]]
 
 --================================================================================
--- BAGIAN 1: SAFE PARENT UNTUK UI
+-- BAGIAN 1: PEMBUATAN ANTARMUKA PENGGUNA (UI)
 --================================================================================
 
-local CoreGui = game:GetService("CoreGui")
-local safeParent = (gethui and gethui()) or CoreGui
-
--- Hapus UI lama
-if safeParent:FindFirstChild("MuiHubWebhookUI") then
-    safeParent.MuiHubWebhookUI:Destroy()
+if game:GetService("CoreGui"):FindFirstChild("MuiHubWebhookUI") then
+    game:GetService("CoreGui").MuiHubWebhookUI:Destroy()
 end
 
 local webhookUrlBox
@@ -33,13 +31,11 @@ for _, biomeName in ipairs(availableBiomes) do
     biomeWhitelist[biomeName] = false
 end
 
--- ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MuiHubWebhookUI"
-ScreenGui.Parent = safeParent
+ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 
--- Frame utama
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
@@ -50,9 +46,6 @@ MainFrame.Position = UDim2.new(0.5, -210, 0.5, -175)
 MainFrame.Size = UDim2.new(0, 420, 0, 380)
 MainFrame.ClipsDescendants = true
 
-print("[MuiHub] UI Loaded to: " .. tostring(ScreenGui.Parent))
-
--- Header
 local Header = Instance.new("Frame")
 Header.Name = "Header"
 Header.Parent = MainFrame
@@ -62,13 +55,16 @@ Header.Active = true
 
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local dragging, dragStart, startPos = false, nil, nil
+local dragging = false
+local dragStart
+local startPos
 
 Header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = UserInputService:GetMouseLocation()
         startPos = MainFrame.Position
+
         local connection
         connection = UserInputService.InputEnded:Connect(function(endInput)
             if endInput.UserInputType == Enum.UserInputType.MouseButton1 or endInput.UserInputType == Enum.UserInputType.Touch then
@@ -211,7 +207,6 @@ tabListLayout.Padding = UDim.new(0, 2)
 
 local webhookTabFrame = createTab("Webhook")
 
--- Label + Input webhook
 local webhookInputLabel = Instance.new("TextLabel")
 webhookInputLabel.Parent = webhookTabFrame
 webhookInputLabel.LayoutOrder = 1
@@ -241,7 +236,6 @@ textPadding.Parent = webhookUrlBox
 textPadding.PaddingLeft = UDim.new(0, 8)
 textPadding.PaddingRight = UDim.new(0, 8)
 
--- Tombol Apply + Test
 local buttonContainer = Instance.new("Frame")
 buttonContainer.Parent = webhookTabFrame
 buttonContainer.LayoutOrder = 3
@@ -293,6 +287,71 @@ ApplyButton.MouseButton1Click:Connect(function()
     ApplyButton.BackgroundColor3 = originalColor
 end)
 
+local biomeTitleLabel = Instance.new("TextLabel")
+biomeTitleLabel.Parent = webhookTabFrame
+biomeTitleLabel.LayoutOrder = 4
+biomeTitleLabel.Size = UDim2.new(1, 0, 0, 20)
+biomeTitleLabel.BackgroundTransparency = 1
+biomeTitleLabel.Font = Enum.Font.SourceSans
+biomeTitleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+biomeTitleLabel.Text = "Whitelist Biome (Pilih untuk notifikasi):"
+biomeTitleLabel.TextSize = 14
+biomeTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local biomeContainer = Instance.new("ScrollingFrame")
+biomeContainer.Parent = webhookTabFrame
+biomeContainer.LayoutOrder = 5
+biomeContainer.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+biomeContainer.BorderSizePixel = 1
+biomeContainer.BorderColor3 = Color3.fromRGB(50, 50, 55)
+biomeContainer.Size = UDim2.new(1, 0, 1, -125)
+biomeContainer.CanvasSize = UDim2.new(0, 0, 0, #availableBiomes * 28)
+biomeContainer.ScrollBarThickness = 6
+
+local biomeListLayout = Instance.new("UIListLayout")
+biomeListLayout.Parent = biomeContainer
+biomeListLayout.Padding = UDim.new(0, 3)
+
+for _, biomeName in ipairs(availableBiomes) do
+    local checkboxFrame = Instance.new("Frame")
+    checkboxFrame.Parent = biomeContainer
+    checkboxFrame.BackgroundTransparency = 1
+    checkboxFrame.Size = UDim2.new(1, 0, 0, 25)
+
+    local checkboxButton = Instance.new("TextButton")
+    checkboxButton.Parent = checkboxFrame
+    checkboxButton.Size = UDim2.new(0, 25, 0, 25)
+    checkboxButton.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
+    checkboxButton.Text = ""
+    checkboxButton.Font = Enum.Font.SourceSansBold
+    checkboxButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    checkboxButton.TextSize = 18
+
+    local checkboxLabel = Instance.new("TextLabel")
+    checkboxLabel.Parent = checkboxFrame
+    checkboxLabel.Size = UDim2.new(1, -30, 1, 0)
+    checkboxLabel.Position = UDim2.new(0, 30, 0, 0)
+    checkboxLabel.BackgroundTransparency = 1
+    checkboxLabel.Font = Enum.Font.SourceSans
+    checkboxLabel.Text = biomeName
+    checkboxLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    checkboxLabel.TextSize = 14
+    checkboxLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    checkboxButton.MouseButton1Click:Connect(function()
+        biomeWhitelist[biomeName] = not biomeWhitelist[biomeName]
+        if biomeWhitelist[biomeName] then
+            checkboxButton.BackgroundColor3 = Color3.fromRGB(70, 130, 255)
+            checkboxButton.Text = "✓"
+        else
+            checkboxButton.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
+            checkboxButton.Text = ""
+        end
+    end)
+end
+
+tabs["Webhook"].button.MouseButton1Click:Invoke()
+
 --================================================================================
 -- BAGIAN 2: LOGIKA WEBHOOK
 --================================================================================
@@ -304,7 +363,7 @@ local player = game.Players.LocalPlayer
 
 function SendMessageEMBED(url, embed)
     if not url or url == "" then
-        warn("[MuiHub] Webhook URL kosong. Tekan 'Apply' dulu.")
+        print("MuiHub FATAL: URL Webhook kosong. Tekan 'Apply' terlebih dahulu.")
         return false
     end
 
@@ -337,15 +396,14 @@ function SendMessageEMBED(url, embed)
     end)
 
     if success and response.Success then
-        print("[MuiHub] Embed sent successfully!")
+        print("MuiHub: Embed sent successfully!")
         return true
     else
-        warn("[MuiHub] ERROR SEND → " .. tostring(response.StatusCode or response))
+        print("MuiHub: ERROR SEND → " .. tostring(response.StatusCode or response))
         return false
     end
 end
 
--- Tombol Test
 TestButton.MouseButton1Click:Connect(function()
     local testEmbed = {
         title = "Perubahan Cuaca di Server Roblox",
@@ -359,20 +417,21 @@ TestButton.MouseButton1Click:Connect(function()
     }
 
     local success = SendMessageEMBED(appliedWebhookURL, testEmbed)
+    local originalColor = TestButton.BackgroundColor3
     if success then
         TestButton.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
     else
         TestButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     end
     task.wait(2)
-    TestButton.BackgroundColor3 = Color3.fromRGB(90, 90, 100)
+    TestButton.BackgroundColor3 = originalColor
 end)
 
--- Event listener
 Event.OnClientEvent:Connect(function(id, path, newValue)
     if typeof(path) == "table" and newValue then
         for _, key in ipairs(path) do
             if key == "BiomeName" or key == "Biome" then
+                -- kalau whitelist kosong → kirim semua biome
                 if (next(biomeWhitelist) == nil) or biomeWhitelist[tostring(newValue)] then
                     local embed = {
                         title = "Perubahan Cuaca di Server Roblox",
@@ -393,4 +452,4 @@ Event.OnClientEvent:Connect(function(id, path, newValue)
     end
 end)
 
-print("[MuiHub] Script Webhook v5.2 (Executor Safe) Loaded!")
+print("Script Webhook Biome oleh MuiHub (v5.1 Final Fixed) telah dimuat!")
