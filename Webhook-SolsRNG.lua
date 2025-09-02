@@ -342,4 +342,3 @@ Event.OnClientEvent:Connect(function(id, path, newValue)
 end)
 
 print("Script Webhook Biome oleh MuiHub telah dimuat!")
-
