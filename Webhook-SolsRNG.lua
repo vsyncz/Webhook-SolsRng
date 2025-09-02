@@ -1,14 +1,13 @@
 --[[
     Script: Webhook Biome Notifier
     Author: MuiHub (UI & Features by Gemini)
-    Version: 2.5
+    Version: 2.6
     
     Deskripsi:
     UI yang disempurnakan untuk notifikasi biome.
-    - Menambahkan tombol & fungsionalitas "Apply" untuk menyimpan URL webhook.
-    - Menambahkan padding pada kotak input webhook agar teks tidak tumpang tindih.
-    - Implementasi logika geser (drag) yang sangat halus dan andal.
-    - Perbaikan bug tampilan saat UI di-minimize.
+    - Menambahkan tombol "Test" untuk diagnosa koneksi webhook.
+    - Menambahkan URL webhook sementara sebagai default untuk kemudahan testing.
+    - Fungsionalitas "Apply" untuk menyimpan URL webhook.
 ]]
 
 --================================================================================
@@ -46,8 +45,7 @@ MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 MainFrame.BorderColor3 = Color3.fromRGB(80, 80, 80)
 MainFrame.BorderSizePixel = 1
-MainFrame.Position = UDim2.new(0.5, -210, 0.5, -175)
-MainFrame.Size = UDim2.new(0, 420, 0, 350)
+MainFrame.Position = UDim2.new(0, 420, 0, 350)
 MainFrame.ClipsDescendants = true
 
 -- Header untuk judul dan tombol kontrol
@@ -239,7 +237,7 @@ webhookInputLabel.Text = "URL Webhook Discord:"
 webhookInputLabel.TextSize = 14
 webhookInputLabel.TextXAlignment = Enum.TextXAlignment.Left
 
--- Frame untuk menampung TextBox dan Tombol Apply
+-- Frame untuk menampung TextBox dan Tombol
 local inputContainer = Instance.new("Frame")
 inputContainer.Parent = webhookTabFrame
 inputContainer.LayoutOrder = 2
@@ -256,11 +254,11 @@ inputLayout.Padding = UDim.new(0, 5)
 webhookUrlBox = Instance.new("TextBox")
 webhookUrlBox.Name = "WebhookURLInput"
 webhookUrlBox.Parent = inputContainer
-webhookUrlBox.Size = UDim2.new(1, -75, 1, 0) -- Beri ruang untuk tombol
+webhookUrlBox.Size = UDim2.new(1, -135, 1, 0) -- Beri ruang untuk 2 tombol
 webhookUrlBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 webhookUrlBox.TextColor3 = Color3.fromRGB(220, 220, 220)
 webhookUrlBox.Font = Enum.Font.SourceSans
-webhookUrlBox.Text = ""
+webhookUrlBox.Text = "https://discord.com/api/webhooks/1412511244388405329/fBrCX0p9GfUypT1PnBaA2wK8CkO8JzjUODN8FA8bjhPrmbimSsbyCrzgSAIGoeQi1kJ4" -- Webhook Test Default
 webhookUrlBox.PlaceholderText = "Tempel URL webhook Anda di sini"
 webhookUrlBox.ClearTextOnFocus = false
 webhookUrlBox.TextXAlignment = Enum.TextXAlignment.Left
@@ -274,23 +272,33 @@ textPadding.PaddingRight = UDim.new(0, 8)
 local ApplyButton = Instance.new("TextButton")
 ApplyButton.Name = "ApplyButton"
 ApplyButton.Parent = inputContainer
-ApplyButton.Size = UDim2.new(0, 70, 1, 0)
+ApplyButton.Size = UDim2.new(0, 65, 1, 0)
 ApplyButton.BackgroundColor3 = Color3.fromRGB(70, 130, 255)
 ApplyButton.Font = Enum.Font.SourceSansBold
 ApplyButton.Text = "Apply"
 ApplyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ApplyButton.TextSize = 14
 
+-- Tombol Test
+local TestButton = Instance.new("TextButton")
+TestButton.Name = "TestButton"
+TestButton.Parent = inputContainer
+TestButton.Size = UDim2.new(0, 65, 1, 0)
+TestButton.BackgroundColor3 = Color3.fromRGB(90, 90, 100)
+TestButton.Font = Enum.Font.SourceSansBold
+TestButton.Text = "Test"
+TestButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+TestButton.TextSize = 14
+
 ApplyButton.MouseButton1Click:Connect(function()
     local url = webhookUrlBox.Text
     if url:match("^https://discord.com/api/webhooks/") then
         appliedWebhookURL = url
-        local originalText = ApplyButton.Text
         local originalColor = ApplyButton.BackgroundColor3
         ApplyButton.Text = "Applied ✓"
         ApplyButton.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
         task.wait(2)
-        ApplyButton.Text = originalText
+        ApplyButton.Text = "Apply"
         ApplyButton.BackgroundColor3 = originalColor
     else
         appliedWebhookURL = "" -- Kosongkan jika tidak valid
@@ -300,7 +308,6 @@ ApplyButton.MouseButton1Click:Connect(function()
         ApplyButton.BackgroundColor3 = originalColor
     end
 end)
-
 
 -- 2. Daftar Centang Biome
 local biomeTitleLabel = Instance.new("TextLabel")
@@ -395,16 +402,41 @@ function SendMessageEMBED(embed)
     }
     local data = { ["embeds"] = {embedData} }
     
-    pcall(function()
-        HttpService:RequestAsync({
+    local success, response = pcall(function()
+        return HttpService:RequestAsync({
             Url = appliedWebhookURL,
             Method = "POST",
             Headers = headers,
             Body = HttpService:JSONEncode(data)
         })
-        print("MuiHub: Notifikasi embed dikirim ke Discord!")
     end)
+
+    if success and response.Success then
+        print("MuiHub: Notifikasi embed berhasil dikirim ke Discord!")
+        return true
+    else
+        print("MuiHub: Gagal mengirim notifikasi embed. Cek kembali URL webhook Anda.")
+        return false
+    end
 end
+
+TestButton.MouseButton1Click:Connect(function()
+    local testEmbed = {
+        title = "Pesan Uji Coba dari MuiHub",
+        description = "Jika Anda melihat pesan ini, artinya webhook Anda berfungsi dengan benar!",
+        color = 8311585, -- Hijau
+        footer = { text = "MuiHub Notifier | Test Message" }
+    }
+    local success = SendMessageEMBED(testEmbed)
+    local originalColor = TestButton.BackgroundColor3
+    if success then
+        TestButton.BackgroundColor3 = Color3.fromRGB(80, 180, 100) -- Hijau
+    else
+        TestButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Merah
+    end
+    task.wait(2)
+    TestButton.BackgroundColor3 = originalColor
+end)
 
 Event.OnClientEvent:Connect(function(id, path, newValue)
     if typeof(path) == "table" and newValue then
