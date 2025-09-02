@@ -1,10 +1,11 @@
 --[[
     Script: Webhook Biome Notifier
     Author: MuiHub (UI & Features by Gemini)
-    Version: 2.4
+    Version: 2.5
     
     Deskripsi:
     UI yang disempurnakan untuk notifikasi biome.
+    - Menambahkan tombol & fungsionalitas "Apply" untuk menyimpan URL webhook.
     - Menambahkan padding pada kotak input webhook agar teks tidak tumpang tindih.
     - Implementasi logika geser (drag) yang sangat halus dan andal.
     - Perbaikan bug tampilan saat UI di-minimize.
@@ -21,6 +22,8 @@ end
 
 -- Inisialisasi variabel dan daftar biome
 local webhookUrlBox
+local appliedWebhookURL = "" -- Variabel untuk menyimpan URL yang sudah di-apply
+
 local availableBiomes = {
     "Windy", "BlazingSun", "Snowy", "Rainy", "Null", 
     "Sandstorm", "Hell", "Starfall", "Corruption", "Dreamspace", "Glitched"
@@ -236,24 +239,67 @@ webhookInputLabel.Text = "URL Webhook Discord:"
 webhookInputLabel.TextSize = 14
 webhookInputLabel.TextXAlignment = Enum.TextXAlignment.Left
 
+-- Frame untuk menampung TextBox dan Tombol Apply
+local inputContainer = Instance.new("Frame")
+inputContainer.Parent = webhookTabFrame
+inputContainer.LayoutOrder = 2
+inputContainer.BackgroundTransparency = 1
+inputContainer.Size = UDim2.new(1, 0, 0, 30)
+
+local inputLayout = Instance.new("UIListLayout")
+inputLayout.Parent = inputContainer
+inputLayout.FillDirection = Enum.FillDirection.Horizontal
+inputLayout.SortOrder = Enum.SortOrder.LayoutOrder
+inputLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+inputLayout.Padding = UDim.new(0, 5)
+
 webhookUrlBox = Instance.new("TextBox")
 webhookUrlBox.Name = "WebhookURLInput"
-webhookUrlBox.Parent = webhookTabFrame
-webhookUrlBox.LayoutOrder = 2
-webhookUrlBox.Size = UDim2.new(1, 0, 0, 30)
+webhookUrlBox.Parent = inputContainer
+webhookUrlBox.Size = UDim2.new(1, -75, 1, 0) -- Beri ruang untuk tombol
 webhookUrlBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 webhookUrlBox.TextColor3 = Color3.fromRGB(220, 220, 220)
 webhookUrlBox.Font = Enum.Font.SourceSans
 webhookUrlBox.Text = ""
 webhookUrlBox.PlaceholderText = "Tempel URL webhook Anda di sini"
 webhookUrlBox.ClearTextOnFocus = false
-webhookUrlBox.TextXAlignment = Enum.TextXAlignment.Left -- Jaga teks tetap di kiri
+webhookUrlBox.TextXAlignment = Enum.TextXAlignment.Left
 
--- PERBAIKAN: Menambahkan padding agar teks tidak tumpang tindih
 local textPadding = Instance.new("UIPadding")
 textPadding.Parent = webhookUrlBox
 textPadding.PaddingLeft = UDim.new(0, 8)
 textPadding.PaddingRight = UDim.new(0, 8)
+
+-- Tombol Apply
+local ApplyButton = Instance.new("TextButton")
+ApplyButton.Name = "ApplyButton"
+ApplyButton.Parent = inputContainer
+ApplyButton.Size = UDim2.new(0, 70, 1, 0)
+ApplyButton.BackgroundColor3 = Color3.fromRGB(70, 130, 255)
+ApplyButton.Font = Enum.Font.SourceSansBold
+ApplyButton.Text = "Apply"
+ApplyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ApplyButton.TextSize = 14
+
+ApplyButton.MouseButton1Click:Connect(function()
+    local url = webhookUrlBox.Text
+    if url:match("^https://discord.com/api/webhooks/") then
+        appliedWebhookURL = url
+        local originalText = ApplyButton.Text
+        local originalColor = ApplyButton.BackgroundColor3
+        ApplyButton.Text = "Applied ✓"
+        ApplyButton.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
+        task.wait(2)
+        ApplyButton.Text = originalText
+        ApplyButton.BackgroundColor3 = originalColor
+    else
+        appliedWebhookURL = "" -- Kosongkan jika tidak valid
+        local originalColor = ApplyButton.BackgroundColor3
+        ApplyButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        task.wait(1)
+        ApplyButton.BackgroundColor3 = originalColor
+    end
+end)
 
 
 -- 2. Daftar Centang Biome
@@ -333,10 +379,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Event = ReplicatedStorage.ReplicaRemoteEvents.Replica_ReplicaSetValue
 
 function SendMessageEMBED(embed)
-    local webhookURL = webhookUrlBox and webhookUrlBox.Text or ""
-    
-    if not webhookURL:match("^https://discord.com/api/webhooks/") then
-        print("MuiHub: URL Webhook tidak valid atau kosong. Notifikasi dibatalkan.")
+    -- Gunakan URL yang sudah di-apply
+    if not appliedWebhookURL:match("^https://discord.com/api/webhooks/") then
+        print("MuiHub: URL Webhook tidak valid atau belum di-apply. Notifikasi dibatalkan.")
         return false
     end
 
@@ -352,7 +397,7 @@ function SendMessageEMBED(embed)
     
     pcall(function()
         HttpService:RequestAsync({
-            Url = webhookURL,
+            Url = appliedWebhookURL,
             Method = "POST",
             Headers = headers,
             Body = HttpService:JSONEncode(data)
