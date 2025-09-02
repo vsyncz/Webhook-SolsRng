@@ -1,13 +1,13 @@
 --[[
     Script: Webhook Biome Notifier
     Author: MuiHub (UI & Features by Gemini)
-    Version: 2.0
+    Version: 2.1
     
     Deskripsi:
     UI yang disempurnakan untuk notifikasi biome.
-    - Judul baru: "Webhook Biome By MuiHub"
+    - Fungsionalitas geser (drag) dipastikan berfungsi pada header.
+    - Menghilangkan nama objek "TextBox" default yang mungkin muncul.
     - Tombol Minimize untuk menyembunyikan/menampilkan UI.
-    - Perbaikan bug di mana konten tab tidak muncul.
 ]]
 
 --================================================================================
@@ -47,7 +47,7 @@ MainFrame.Position = UDim2.new(0.5, -210, 0.5, -175)
 MainFrame.Size = UDim2.new(0, 420, 0, 350)
 MainFrame.ClipsDescendants = true
 MainFrame.Active = true
-MainFrame.Draggable = true
+MainFrame.Draggable = true -- MEMBUAT UI INI BISA DIGESER DENGAN MENEKAN DAN MENAHAN BAGIAN MANA SAJA (TERUTAMA HEADER)
 
 -- Header untuk judul dan tombol kontrol
 local Header = Instance.new("Frame")
@@ -63,7 +63,7 @@ TitleLabel.BackgroundTransparency = 1
 TitleLabel.Size = UDim2.new(1, -60, 1, 0)
 TitleLabel.Position = UDim2.new(0, 10, 0, 0)
 TitleLabel.Font = Enum.Font.SourceSansBold
-TitleLabel.Text = "Webhook Biome By MuiHub" -- Judul baru
+TitleLabel.Text = "Webhook Biome By MuiHub"
 TitleLabel.TextColor3 = Color3.fromRGB(225, 225, 225)
 TitleLabel.TextSize = 16
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -205,6 +205,7 @@ webhookInputLabel.TextSize = 14
 webhookInputLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 webhookUrlBox = Instance.new("TextBox")
+webhookUrlBox.Name = "WebhookURLInput" -- Perubahan: Memberi nama unik untuk menghindari tulisan "TextBox"
 webhookUrlBox.Parent = webhookTabFrame
 webhookUrlBox.LayoutOrder = 2
 webhookUrlBox.Size = UDim2.new(1, 0, 0, 30)
@@ -341,3 +342,4 @@ Event.OnClientEvent:Connect(function(id, path, newValue)
 end)
 
 print("Script Webhook Biome oleh MuiHub telah dimuat!")
+
