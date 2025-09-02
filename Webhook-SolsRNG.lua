@@ -1,10 +1,11 @@
 --[[
     Script: Webhook Biome Notifier
     Author: MuiHub (UI & Features by Gemini)
-    Version: 2.7
+    Version: 2.8
     
     Deskripsi:
     UI yang disempurnakan untuk notifikasi biome.
+    - Tata letak tombol "Apply" & "Test" dipindahkan ke bawah kotak input.
     - Webhook sementara kini menjadi default dan aktif secara otomatis.
     - Pengguna dapat menggantinya dengan webhook kustom (opsional) menggunakan tombol "Apply".
     - Tombol "Test" untuk diagnosa koneksi webhook yang sedang aktif.
@@ -47,7 +48,7 @@ MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 MainFrame.BorderColor3 = Color3.fromRGB(80, 80, 80)
 MainFrame.BorderSizePixel = 1
 MainFrame.Position = UDim2.new(0.5, -210, 0.5, -175)
-MainFrame.Size = UDim2.new(0, 420, 0, 350)
+MainFrame.Size = UDim2.new(0, 420, 0, 380) -- Ukuran disesuaikan sedikit
 MainFrame.ClipsDescendants = true
 
 -- Header untuk judul dan tombol kontrol
@@ -146,7 +147,7 @@ MinimizeButton.MouseButton1Click:Connect(function()
         MainFrame:TweenSize(UDim2.new(0, 420, 0, 30), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
         MinimizeButton.Text = "+"
     else
-        MainFrame:TweenSize(UDim2.new(0, 420, 0, 350), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
+        MainFrame:TweenSize(UDim2.new(0, 420, 0, 380), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
         MinimizeButton.Text = "—"
     end
 end)
@@ -239,24 +240,11 @@ webhookInputLabel.Text = "URL Webhook Kustom (Opsional):"
 webhookInputLabel.TextSize = 14
 webhookInputLabel.TextXAlignment = Enum.TextXAlignment.Left
 
--- Frame untuk menampung TextBox dan Tombol
-local inputContainer = Instance.new("Frame")
-inputContainer.Parent = webhookTabFrame
-inputContainer.LayoutOrder = 2
-inputContainer.BackgroundTransparency = 1
-inputContainer.Size = UDim2.new(1, 0, 0, 30)
-
-local inputLayout = Instance.new("UIListLayout")
-inputLayout.Parent = inputContainer
-inputLayout.FillDirection = Enum.FillDirection.Horizontal
-inputLayout.SortOrder = Enum.SortOrder.LayoutOrder
-inputLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-inputLayout.Padding = UDim.new(0, 5)
-
 webhookUrlBox = Instance.new("TextBox")
 webhookUrlBox.Name = "WebhookURLInput"
-webhookUrlBox.Parent = inputContainer
-webhookUrlBox.Size = UDim2.new(1, -135, 1, 0) -- Beri ruang untuk 2 tombol
+webhookUrlBox.Parent = webhookTabFrame
+webhookUrlBox.LayoutOrder = 2
+webhookUrlBox.Size = UDim2.new(1, 0, 0, 30)
 webhookUrlBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 webhookUrlBox.TextColor3 = Color3.fromRGB(220, 220, 220)
 webhookUrlBox.Font = Enum.Font.SourceSans
@@ -270,11 +258,26 @@ textPadding.Parent = webhookUrlBox
 textPadding.PaddingLeft = UDim.new(0, 8)
 textPadding.PaddingRight = UDim.new(0, 8)
 
+-- Frame untuk menampung Tombol Apply & Test
+local buttonContainer = Instance.new("Frame")
+buttonContainer.Parent = webhookTabFrame
+buttonContainer.LayoutOrder = 3
+buttonContainer.BackgroundTransparency = 1
+buttonContainer.Size = UDim2.new(1, 0, 0, 30)
+
+local buttonLayout = Instance.new("UIListLayout")
+buttonLayout.Parent = buttonContainer
+buttonLayout.FillDirection = Enum.FillDirection.Horizontal
+buttonLayout.SortOrder = Enum.SortOrder.LayoutOrder
+buttonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+buttonLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+buttonLayout.Padding = UDim.new(0, 10)
+
 -- Tombol Apply
 local ApplyButton = Instance.new("TextButton")
 ApplyButton.Name = "ApplyButton"
-ApplyButton.Parent = inputContainer
-ApplyButton.Size = UDim2.new(0, 65, 1, 0)
+ApplyButton.Parent = buttonContainer
+ApplyButton.Size = UDim2.new(0.5, -5, 1, 0)
 ApplyButton.BackgroundColor3 = Color3.fromRGB(70, 130, 255)
 ApplyButton.Font = Enum.Font.SourceSansBold
 ApplyButton.Text = "Apply"
@@ -284,8 +287,8 @@ ApplyButton.TextSize = 14
 -- Tombol Test
 local TestButton = Instance.new("TextButton")
 TestButton.Name = "TestButton"
-TestButton.Parent = inputContainer
-TestButton.Size = UDim2.new(0, 65, 1, 0)
+TestButton.Parent = buttonContainer
+TestButton.Size = UDim2.new(0.5, -5, 1, 0)
 TestButton.BackgroundColor3 = Color3.fromRGB(90, 90, 100)
 TestButton.Font = Enum.Font.SourceSansBold
 TestButton.Text = "Test"
@@ -296,19 +299,16 @@ ApplyButton.MouseButton1Click:Connect(function()
     local url = webhookUrlBox.Text
     local originalColor = ApplyButton.BackgroundColor3
     
-    -- Jika memasukkan URL valid
     if url:match("^https://discord.com/api/webhooks/") then
         appliedWebhookURL = url
         ApplyButton.Text = "Applied ✓"
         ApplyButton.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
         task.wait(2)
-    -- Jika kotak dikosongkan, kembali ke default
     elseif url == "" then
         appliedWebhookURL = defaultWebhookURL
         ApplyButton.Text = "Defaulted"
         ApplyButton.BackgroundColor3 = Color3.fromRGB(70, 130, 255)
         task.wait(2)
-    -- Jika URL tidak valid
     else
         ApplyButton.Text = "Invalid"
         ApplyButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
@@ -322,7 +322,7 @@ end)
 -- 2. Daftar Centang Biome
 local biomeTitleLabel = Instance.new("TextLabel")
 biomeTitleLabel.Parent = webhookTabFrame
-biomeTitleLabel.LayoutOrder = 3
+biomeTitleLabel.LayoutOrder = 4
 biomeTitleLabel.Size = UDim2.new(1, 0, 0, 20)
 biomeTitleLabel.BackgroundTransparency = 1
 biomeTitleLabel.Font = Enum.Font.SourceSans
@@ -333,11 +333,11 @@ biomeTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 local biomeContainer = Instance.new("ScrollingFrame")
 biomeContainer.Parent = webhookTabFrame
-biomeContainer.LayoutOrder = 4
+biomeContainer.LayoutOrder = 5
 biomeContainer.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
 biomeContainer.BorderSizePixel = 1
 biomeContainer.BorderColor3 = Color3.fromRGB(50, 50, 55)
-biomeContainer.Size = UDim2.new(1, 0, 1, -85)
+biomeContainer.Size = UDim2.new(1, 0, 1, -125)
 biomeContainer.CanvasSize = UDim2.new(0, 0, 0, #availableBiomes * 28)
 biomeContainer.ScrollBarThickness = 6
 
@@ -470,5 +470,4 @@ Event.OnClientEvent:Connect(function(id, path, newValue)
 end)
 
 print("Script Webhook Biome oleh MuiHub telah dimuat!")
-
 
