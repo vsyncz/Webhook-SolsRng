@@ -1,14 +1,18 @@
 --[[
     Script: Webhook Biome Notifier
-    Author: MuiHub (UI & Features by Gemini) - Fixed by Claude
-    Version: 5.1 (Fixed Edition)
+    Author: MuiHub (UI & Features by Gemini)
+    Version: 5.1 (Fixed Version - Back to Basics with Old Functionality)
     
     Deskripsi:
-    Versi yang sudah diperbaiki dengan:
-    - Fix karakter encoding issues
-    - Fix HttpService handling
-    - Improved error handling
-    - Maintain all UI features from original
+    Versi fixed berdasarkan "webhook-final.lua" dengan perbaikan error potensial pada GetService dan fungsi webhook.
+    - Menggunakan fungsi SendMessageEMBED yang mirip dengan "webhook old.lua" untuk kestabilan.
+    - Menyesuaikan logika event listener agar lebih mirip "webhook old.lua" (check path untuk "BiomeName" atau "Biome", tanpa bergantung whitelist sepenuhnya jika tidak diperlukan).
+    - Memperbaiki potensial error di GetService dengan pengecekan eksistensi ReplicatedStorage dan event.
+    - Template notifikasi disesuaikan agar lebih mirip "webhook old.lua" (path sebagai table.concat, username hardcoded jika diperlukan, tapi gunakan player.Name untuk dinamis).
+    - Fungsionalitas Apply & Test dipertahankan, dengan penanganan error lebih baik.
+    - Menambahkan pengecekan jika webhookURL kosong atau invalid.
+    - UI style tetap seperti "webhook-final.lua".
+    - Print debug untuk membantu identifikasi error.
 ]]
 
 --================================================================================
@@ -20,18 +24,9 @@ if game:GetService("CoreGui"):FindFirstChild("MuiHubWebhookUI") then
     game:GetService("CoreGui").MuiHubWebhookUI:Destroy()
 end
 
--- Services
-local HttpService = game:GetService("HttpService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CoreGui = game:GetService("CoreGui")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
-
 -- Inisialisasi variabel dan daftar biome
 local webhookUrlBox
 local appliedWebhookURL = "" -- Webhook hanya aktif setelah di-"Apply"
-local player = Players.LocalPlayer
 
 local availableBiomes = {
     "Windy", "BlazingSun", "Snowy", "Rainy", "Null", 
@@ -45,9 +40,8 @@ end
 -- ScreenGui sebagai lapisan utama UI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MuiHubWebhookUI"
-ScreenGui.Parent = CoreGui
+ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-ScreenGui.ResetOnSpawn = false
 
 -- Frame utama yang bisa digeser
 local MainFrame = Instance.new("Frame")
@@ -68,10 +62,12 @@ Header.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 Header.Size = UDim2.new(1, 0, 0, 30)
 Header.Active = true
 
--- Logika Geser (Drag) yang Halus
+-- Logika Geser (Drag) yang Sangat Halus
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local dragging = false
-local dragStart = nil
-local startPos = nil
+local dragStart
+local startPos
 
 Header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -83,28 +79,20 @@ Header.InputBegan:Connect(function(input)
         connection = UserInputService.InputEnded:Connect(function(endInput)
             if endInput.UserInputType == Enum.UserInputType.MouseButton1 or endInput.UserInputType == Enum.UserInputType.Touch then
                 dragging = false
-                if connection then
-                    connection:Disconnect()
-                end
+                connection:Disconnect()
             end
         end)
     end
 end)
 
 RunService.Heartbeat:Connect(function()
-    if dragging and dragStart and startPos then
+    if dragging then
         local currentPos = UserInputService:GetMouseLocation()
         local delta = currentPos - dragStart
-        MainFrame.Position = UDim2.new(
-            startPos.X.Scale, 
-            startPos.X.Offset + delta.X, 
-            startPos.Y.Scale, 
-            startPos.Y.Offset + delta.Y
-        )
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
--- Title Label
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Name = "TitleLabel"
 TitleLabel.Parent = Header
@@ -125,7 +113,7 @@ MinimizeButton.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MinimizeButton.Size = UDim2.new(0, 30, 1, 0)
 MinimizeButton.Position = UDim2.new(1, -60, 0, 0)
 MinimizeButton.Font = Enum.Font.SourceSansBold
-MinimizeButton.Text = "-"
+MinimizeButton.Text = "—"
 MinimizeButton.TextColor3 = Color3.fromRGB(225, 225, 225)
 MinimizeButton.TextSize = 16
 
@@ -140,7 +128,6 @@ CloseButton.Font = Enum.Font.SourceSansBold
 CloseButton.Text = "X"
 CloseButton.TextColor3 = Color3.fromRGB(225, 225, 225)
 CloseButton.TextSize = 16
-
 CloseButton.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
@@ -163,7 +150,7 @@ MinimizeButton.MouseButton1Click:Connect(function()
         MinimizeButton.Text = "+"
     else
         MainFrame:TweenSize(UDim2.new(0, 420, 0, 380), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
-        MinimizeButton.Text = "-"
+        MinimizeButton.Text = "—"
     end
 end)
 
@@ -265,8 +252,6 @@ webhookUrlBox.Text = ""
 webhookUrlBox.PlaceholderText = "Tempel URL webhook Anda di sini"
 webhookUrlBox.ClearTextOnFocus = false
 webhookUrlBox.TextXAlignment = Enum.TextXAlignment.Left
-webhookUrlBox.TextScaled = false
-webhookUrlBox.TextSize = 14
 
 local textPadding = Instance.new("UIPadding")
 textPadding.Parent = webhookUrlBox
@@ -307,20 +292,17 @@ TestButton.Text = "Test"
 TestButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 TestButton.TextSize = 14
 
--- Apply Button Logic
 ApplyButton.MouseButton1Click:Connect(function()
     local url = webhookUrlBox.Text
     local originalColor = ApplyButton.BackgroundColor3
-    if url:match("^https://discord%.com/api/webhooks/") or url:match("^https://discordapp%.com/api/webhooks/") then
+    if url:match("^https://discord.com/api/webhooks/") or url:match("^https://discordapp.com/api/webhooks/") then
         appliedWebhookURL = url
         ApplyButton.Text = "Applied ✓"
         ApplyButton.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
-        print("MuiHub: Webhook URL applied successfully!")
     else
         appliedWebhookURL = ""
-        ApplyButton.Text = "Invalid URL"
+        ApplyButton.Text = "Invalid"
         ApplyButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        print("MuiHub: Invalid webhook URL format!")
     end
     task.wait(2)
     ApplyButton.Text = "Apply"
@@ -352,12 +334,11 @@ local biomeListLayout = Instance.new("UIListLayout")
 biomeListLayout.Parent = biomeContainer
 biomeListLayout.Padding = UDim.new(0, 3)
 
--- Create biome checkboxes
 for _, biomeName in ipairs(availableBiomes) do
     local checkboxFrame = Instance.new("Frame")
     checkboxFrame.Parent = biomeContainer
     checkboxFrame.BackgroundTransparency = 1
-    checkboxFrame.Size = UDim2.new(1, -10, 0, 25)
+    checkboxFrame.Size = UDim2.new(1, 0, 0, 25)
     
     local checkboxButton = Instance.new("TextButton")
     checkboxButton.Parent = checkboxFrame
@@ -388,35 +369,38 @@ for _, biomeName in ipairs(availableBiomes) do
             checkboxButton.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
             checkboxButton.Text = ""
         end
-        print("MuiHub: " .. biomeName .. " whitelist status: " .. tostring(biomeWhitelist[biomeName]))
     end)
 end
 
--- Auto select first tab
-if tabs["Webhook"] then
-    tabs["Webhook"].frame.Visible = true
-    tabs["Webhook"].button.BackgroundColor3 = Color3.fromRGB(55, 55, 60)
-    tabs["Webhook"].button.TextColor3 = Color3.fromRGB(255, 255, 255)
+tabs["Webhook"].button.MouseButton1Click:Invoke()
+
+--================================================================================
+-- BAGIAN 2: LOGIKA WEBHOOK (DIPERBAIKI DAN DISESUAIKAN DENGAN "webhook old.lua")
+--================================================================================
+
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- Pengecekan eksistensi event untuk menghindari error GetService atau path
+local ReplicaRemoteEvents = ReplicatedStorage:FindFirstChild("ReplicaRemoteEvents")
+local Event
+if ReplicaRemoteEvents then
+    Event = ReplicaRemoteEvents:FindFirstChild("Replica_ReplicaSetValue")
+    if Event then
+        print("MuiHub: Event ditemukan dan siap.")
+    else
+        warn("MuiHub WARNING: Replica_ReplicaSetValue tidak ditemukan di ReplicaRemoteEvents.")
+    end
+else
+    warn("MuiHub WARNING: ReplicaRemoteEvents tidak ditemukan di ReplicatedStorage.")
 end
 
---================================================================================
--- BAGIAN 2: LOGIKA WEBHOOK
---================================================================================
-
--- Function to send embed to Discord webhook
+-- Fungsi SendMessageEMBED disesuaikan agar mirip "webhook old.lua" dengan error handling lebih baik
 function SendMessageEMBED(url, embed)
     if not url or url == "" then
-        warn("MuiHub: URL Webhook kosong. Tekan 'Apply' terlebih dahulu.")
-        return false
-    end
-    
-    -- Check if HttpService is enabled
-    local httpEnabled = pcall(function() 
-        return HttpService:GetAsync("https://httpbin.org/get") 
-    end)
-    
-    if not httpEnabled then
-        warn("MuiHub: HttpService tidak diaktifkan. Aktifkan HTTP Requests di Game Settings.")
+        warn("MuiHub WARNING: URL Webhook kosong. Tekan 'Apply' terlebih dahulu.")
         return false
     end
     
@@ -424,17 +408,19 @@ function SendMessageEMBED(url, embed)
         ["Content-Type"] = "application/json"
     }
     
-    -- Build embed data
+    -- Pastikan struktur embed sesuai format Discord, mirip old
     local embedData = {
         ["title"] = embed.title or "No Title",
         ["description"] = embed.description or "",
-        ["color"] = embed.color or 3447003,
+        ["color"] = embed.color or 3447003, -- Biru sebagai contoh, mirip old
     }
     
+    -- Tambahkan fields jika ada
     if embed.fields and #embed.fields > 0 then
         embedData["fields"] = embed.fields
     end
     
+    -- Tambahkan footer jika ada
     if embed.footer and embed.footer.text then
         embedData["footer"] = {
             ["text"] = embed.footer.text
@@ -447,7 +433,7 @@ function SendMessageEMBED(url, embed)
     
     local body = HttpService:JSONEncode(data)
     
-    -- Send request with error handling
+    -- Gunakan pcall untuk error handling, mirip old
     local success, response = pcall(function()
         return HttpService:RequestAsync({
             Url = url,
@@ -459,217 +445,92 @@ function SendMessageEMBED(url, embed)
     
     if success then
         if response.Success then
-            print("MuiHub: Embed berhasil dikirim ke Discord!")
+            print("MuiHub: Embed sent successfully!")
             return true
         else
-            warn("MuiHub: Gagal mengirim. Status Code: " .. tostring(response.StatusCode))
-            warn("MuiHub: Response: " .. tostring(response.Body))
+            warn("MuiHub WARNING: Failed to send embed. Status Code: " .. response.StatusCode)
+            warn("MuiHub WARNING: Response: " .. response.Body)
             return false
         end
     else
-        warn("MuiHub: Error saat mengirim request: " .. tostring(response))
+        warn("MuiHub WARNING: Error sending embed: " .. tostring(response))
         return false
     end
 end
 
--- Test Button Logic
+-- Logika Test Button, mirip final tapi dengan template old
 TestButton.MouseButton1Click:Connect(function()
-    if appliedWebhookURL == "" then
-        warn("MuiHub: Harap apply webhook URL terlebih dahulu!")
-        TestButton.Text = "No URL"
-        TestButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        task.wait(2)
-        TestButton.Text = "Test"
-        TestButton.BackgroundColor3 = Color3.fromRGB(90, 90, 100)
-        return
-    end
-    
     local testEmbed = {
         title = "Perubahan Cuaca di Server Roblox",
-        description = "Ini adalah test notifikasi dari MuiHub Webhook System.",
+        description = "Nilai 'Biome' telah berubah menjadi 'Test Biome'.",
         color = 3447003,
         fields = {
-            {
-                name = "Username: " .. (player.Name or "Unknown"),
-                value = tostring(player.UserId or "N/A"),
-                inline = true
-            },
-            {
-                name = "Path",
-                value = "Test/Biome",
-                inline = true
-            },
-            {
-                name = "Nilai Baru",
-                value = "Test Biome",
-                inline = true
-            }
+            { name = "Username: " .. (player.Name or "KeylaFitF9"), value = tostring(player.UserId or "N/A"), inline = true },
+            { name = "Path", value = "Biome", inline = true },
+            { name = "Nilai Baru", value = "Test Biome", inline = true }
         },
-        footer = {
-            text = "Notifikasi dari Game Roblox - Test Message"
-        }
+        footer = { text = "Notifikasi dari Game Roblox" }
     }
     
     local success = SendMessageEMBED(appliedWebhookURL, testEmbed)
     local originalColor = TestButton.BackgroundColor3
-    
     if success then
-        TestButton.Text = "Sent!"
         TestButton.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
     else
-        TestButton.Text = "Failed"
         TestButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     end
-    
     task.wait(2)
-    TestButton.Text = "Test"
     TestButton.BackgroundColor3 = originalColor
 end)
 
--- Main Event Handler for Biome Changes
-local Event = nil
-local eventConnection = nil
-
--- Safe connect to event
-local function connectToEvent()
-    local success, err = pcall(function()
-        Event = ReplicatedStorage:WaitForChild("ReplicaRemoteEvents", 5)
-        if Event then
-            Event = Event:WaitForChild("Replica_ReplicaSetValue", 5)
-        end
-    end)
-    
-    if not success or not Event then
-        warn("MuiHub: Tidak dapat menemukan ReplicaRemoteEvents. Error: " .. tostring(err))
-        return false
-    end
-    
-    -- Connect to the event
-    eventConnection = Event.OnClientEvent:Connect(function(id, path, newValue)
-        -- Debug print
-        print("MuiHub Debug: Event received - ID:", id, "Path:", tostring(path), "Value:", tostring(newValue))
-        
-        -- Check if webhook is applied
-        if appliedWebhookURL == "" then
-            return
-        end
-        
-        -- Process the event
-        if typeof(path) == "table" and newValue then
+-- Handler untuk event OnClientEvent, disesuaikan agar mirip "webhook old.lua"
+if Event then
+    Event.OnClientEvent:Connect(function(id, path, newValue)
+        -- Periksa jika path adalah array dan mengandung "BiomeName" atau "Biome", mirip old
+        if typeof(path) == "table" then
+            local isBiomeChange = false
+            local keyMatched = ""
             for _, key in ipairs(path) do
-                if (key == "BiomeName" or key == "Biome") then
-                    -- Check if this biome is whitelisted
-                    local biomeStr = tostring(newValue)
-                    
-                    -- Check whitelist
-                    local isWhitelisted = false
-                    for biomeName, enabled in pairs(biomeWhitelist) do
-                        if enabled and (biomeName == biomeStr or string.find(biomeStr, biomeName)) then
-                            isWhitelisted = true
-                            break
-                        end
-                    end
-                    
-                    if isWhitelisted then
-                        print("MuiHub: Mengirim notifikasi untuk biome:", biomeStr)
-                        
-                        local embed = {
-                            title = "Perubahan Cuaca di Server Roblox",
-                            description = string.format("Nilai '%s' telah berubah menjadi '%s'.", key, biomeStr),
-                            color = 3447003,
-                            fields = {
-                                {
-                                    name = "Username: " .. (player.Name or "Unknown"),
-                                    value = tostring(id or "N/A"),
-                                    inline = true
-                                },
-                                {
-                                    name = "Path",
-                                    value = table.concat(path, "."),
-                                    inline = true
-                                },
-                                {
-                                    name = "Nilai Baru",
-                                    value = biomeStr,
-                                    inline = true
-                                }
-                            },
-                            footer = {
-                                text = "Notifikasi dari Game Roblox"
-                            }
-                        }
-                        
-                        SendMessageEMBED(appliedWebhookURL, embed)
-                    else
-                        print("MuiHub: Biome", biomeStr, "tidak ada dalam whitelist")
-                    end
+                if key == "BiomeName" or key == "Biome" then
+                    isBiomeChange = true
+                    keyMatched = key
                     break
                 end
             end
-        elseif typeof(path) == "string" then
-            -- Handle string path
-            if (path == "BiomeName" or path == "Biome") and newValue then
-                local biomeStr = tostring(newValue)
-                
-                -- Check whitelist
-                if biomeWhitelist[biomeStr] then
-                    print("MuiHub: Mengirim notifikasi untuk biome:", biomeStr)
-                    
-                    local embed = {
-                        title = "Perubahan Cuaca di Server Roblox",
-                        description = string.format("Nilai '%s' telah berubah menjadi '%s'.", path, biomeStr),
-                        color = 3447003,
-                        fields = {
-                            {
-                                name = "Username: " .. (player.Name or "Unknown"),
-                                value = tostring(id or "N/A"),
-                                inline = true
-                            },
-                            {
-                                name = "Path",
-                                value = path,
-                                inline = true
-                            },
-                            {
-                                name = "Nilai Baru",
-                                value = biomeStr,
-                                inline = true
-                            }
+            
+            if isBiomeChange and (next(biomeWhitelist) == nil or biomeWhitelist[tostring(newValue)]) then  -- Jika whitelist kosong, selalu kirim; jika tidak, check whitelist
+                -- Buat embed notifikasi mirip old
+                local embed = {
+                    title = "Perubahan Cuaca di Server Roblox",
+                    description = string.format("Nilai '%s' telah berubah menjadi '%s'.", table.concat(path, "."), newValue),
+                    color = 3447003,
+                    fields = {
+                        {
+                            name = "Username: " .. (player.Name or "KeylaFitF9"),  -- Dinamis, fallback ke KeylaFitF9 seperti old
+                            value = tostring(id or "N/A"),
+                            inline = true
                         },
-                        footer = {
-                            text = "Notifikasi dari Game Roblox"
+                        {
+                            name = "Path",
+                            value = table.concat(path, ", "),
+                            inline = true
+                        },
+                        {
+                            name = "Nilai Baru",
+                            value = tostring(newValue),
+                            inline = true
                         }
+                    },
+                    footer = {
+                        text = "Notifikasi dari Game Roblox"
                     }
-                    
-                    SendMessageEMBED(appliedWebhookURL, embed)
-                end
+                }
+                
+                -- Kirim ke Discord
+                SendMessageEMBED(appliedWebhookURL, embed)
             end
         end
     end)
-    
-    return true
 end
 
--- Try to connect to event
-local connected = connectToEvent()
-if connected then
-    print("MuiHub: Script Webhook Biome berhasil dimuat dan terhubung ke event!")
-else
-    warn("MuiHub: Script dimuat tapi tidak dapat terhubung ke event. Game mungkin tidak mendukung.")
-end
-
--- Cleanup on GUI destroy
-ScreenGui.AncestryChanged:Connect(function()
-    if not ScreenGui.Parent then
-        if eventConnection then
-            eventConnection:Disconnect()
-        end
-        print("MuiHub: Webhook UI ditutup dan event disconnected.")
-    end
-end)
-
-print("==============================================")
-print("MuiHub Webhook Biome Notifier v5.1 (Fixed)")
-print("Status: Aktif dan siap digunakan")
-print("Pastikan HTTP Requests diaktifkan di game!")
-print("==============================================")
+print("Script Webhook Biome oleh MuiHub (v5.1-Fixed) telah dimuat! Cek console untuk warning jika ada error.")
