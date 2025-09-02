@@ -1,22 +1,19 @@
 --[[
     Script: Webhook Biome Notifier
-    Author: MuiHub (UI & Features by Gemini)
-    Version: 5.1 (Fixed Version - Back to Basics with Old Functionality)
+    Author: MuiHub (UI & Features by Gemini, Fixed by Grok)
+    Version: 5.2 (Added Log Tab for Debugging)
     
     Deskripsi:
-    Versi fixed berdasarkan "webhook-final.lua" dengan perbaikan error potensial pada GetService dan fungsi webhook.
-    - Menggunakan fungsi SendMessageEMBED yang mirip dengan "webhook old.lua" untuk kestabilan.
-    - Menyesuaikan logika event listener agar lebih mirip "webhook old.lua" (check path untuk "BiomeName" atau "Biome", tanpa bergantung whitelist sepenuhnya jika tidak diperlukan).
-    - Memperbaiki potensial error di GetService dengan pengecekan eksistensi ReplicatedStorage dan event.
-    - Template notifikasi disesuaikan agar lebih mirip "webhook old.lua" (path sebagai table.concat, username hardcoded jika diperlukan, tapi gunakan player.Name untuk dinamis).
-    - Fungsionalitas Apply & Test dipertahankan, dengan penanganan error lebih baik.
-    - Menambahkan pengecekan jika webhookURL kosong atau invalid.
-    - UI style tetap seperti "webhook-final.lua".
-    - Print debug untuk membantu identifikasi error.
+    Versi dengan penambahan Tab "Log" untuk menampilkan log real-time.
+    - Log mencakup: Deteksi perubahan biome, hasil pengiriman webhook (sukses/error), hasil test button.
+    - Log ditampilkan di ScrollingFrame di tab Log, dengan timestamp.
+    - Fungsi webhook dan event listener tetap seperti versi 5.1 (mirip old.lua).
+    - UI diperluas dengan tab baru.
+    - Print debug tetap untuk console, tapi log UI lebih user-friendly.
 ]]
 
 --================================================================================
--- BAGIAN 1: PEMBUATAN ANTARMUKA PENGGUNA (UI)
+-- BAGIAN 1: PEMBUATAN ANTARMUKA PENGGUNA (UI) DENGAN TAB LOG BARU
 --================================================================================
 
 -- Hapus UI lama untuk mencegah tumpang tindih
@@ -35,6 +32,42 @@ local availableBiomes = {
 local biomeWhitelist = {}
 for _, biomeName in ipairs(availableBiomes) do
     biomeWhitelist[biomeName] = false
+end
+
+-- Table untuk menyimpan log messages
+local logMessages = {}
+local maxLogLines = 100 -- Batasi jumlah log untuk menghindari overflow
+
+-- Fungsi untuk menambahkan log dan update UI
+local logContainer  -- Forward declaration untuk log container
+local function addLog(message)
+    local timestamp = os.date("%H:%M:%S")
+    table.insert(logMessages, "[" .. timestamp .. "] " .. message)
+    if #logMessages > maxLogLines then
+        table.remove(logMessages, 1)
+    end
+    -- Update UI jika logContainer ada
+    if logContainer then
+        logContainer:ClearAllChildren()
+        local listLayout = Instance.new("UIListLayout")
+        listLayout.Parent = logContainer
+        listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        listLayout.Padding = UDim.new(0, 2)
+        for _, logMsg in ipairs(logMessages) do
+            local logLabel = Instance.new("TextLabel")
+            logLabel.Parent = logContainer
+            logLabel.BackgroundTransparency = 1
+            logLabel.Size = UDim2.new(1, 0, 0, 20)
+            logLabel.Font = Enum.Font.SourceSans
+            logLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+            logLabel.Text = logMsg
+            logLabel.TextSize = 12
+            logLabel.TextXAlignment = Enum.TextXAlignment.Left
+            logLabel.TextWrapped = true
+        end
+        logContainer.CanvasSize = UDim2.new(0, 0, 0, (#logMessages * 22))
+    end
+    print("MuiHub Log: " .. message)  -- Juga print ke console
 end
 
 -- ScreenGui sebagai lapisan utama UI
@@ -225,10 +258,10 @@ local tabListLayout = Instance.new("UIListLayout")
 tabListLayout.Parent = TabContainer
 tabListLayout.Padding = UDim.new(0, 2)
 
--- Membuat tab "Webhook" dan mengambil framenya
+-- Membuat tab "Webhook"
 local webhookTabFrame = createTab("Webhook")
 
--- Menambahkan elemen-elemen UI ke dalam frame tab Webhook
+-- Menambahkan elemen-elemen UI ke dalam frame tab Webhook (sama seperti sebelumnya)
 local webhookInputLabel = Instance.new("TextLabel")
 webhookInputLabel.Parent = webhookTabFrame
 webhookInputLabel.LayoutOrder = 1
@@ -299,10 +332,12 @@ ApplyButton.MouseButton1Click:Connect(function()
         appliedWebhookURL = url
         ApplyButton.Text = "Applied ✓"
         ApplyButton.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
+        addLog("Webhook URL applied successfully.")
     else
         appliedWebhookURL = ""
         ApplyButton.Text = "Invalid"
         ApplyButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        addLog("Invalid Webhook URL.")
     end
     task.wait(2)
     ApplyButton.Text = "Apply"
@@ -372,10 +407,26 @@ for _, biomeName in ipairs(availableBiomes) do
     end)
 end
 
+-- Membuat tab "Log" baru
+local logTabFrame = createTab("Log")
+
+-- ScrollingFrame untuk log di tab Log
+logContainer = Instance.new("ScrollingFrame")
+logContainer.Parent = logTabFrame
+logContainer.LayoutOrder = 1
+logContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+logContainer.BorderSizePixel = 1
+logContainer.BorderColor3 = Color3.fromRGB(50, 50, 55)
+logContainer.Size = UDim2.new(1, 0, 1, 0)
+logContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+logContainer.ScrollBarThickness = 6
+logContainer.VerticalScrollBarPosition = Enum.VerticalScrollBarPosition.Right
+
+-- Inisialisasi tab default ke Webhook
 tabs["Webhook"].button.MouseButton1Click:Invoke()
 
 --================================================================================
--- BAGIAN 2: LOGIKA WEBHOOK (DIPERBAIKI DAN DISESUAIKAN DENGAN "webhook old.lua")
+-- BAGIAN 2: LOGIKA WEBHOOK (DENGAN LOGGING KE TAB LOG)
 --================================================================================
 
 local HttpService = game:GetService("HttpService")
@@ -389,18 +440,18 @@ local Event
 if ReplicaRemoteEvents then
     Event = ReplicaRemoteEvents:FindFirstChild("Replica_ReplicaSetValue")
     if Event then
-        print("MuiHub: Event ditemukan dan siap.")
+        addLog("Event Replica_ReplicaSetValue ditemukan dan siap.")
     else
-        warn("MuiHub WARNING: Replica_ReplicaSetValue tidak ditemukan di ReplicaRemoteEvents.")
+        addLog("WARNING: Replica_ReplicaSetValue tidak ditemukan.")
     end
 else
-    warn("MuiHub WARNING: ReplicaRemoteEvents tidak ditemukan di ReplicatedStorage.")
+    addLog("WARNING: ReplicaRemoteEvents tidak ditemukan di ReplicatedStorage.")
 end
 
--- Fungsi SendMessageEMBED disesuaikan agar mirip "webhook old.lua" dengan error handling lebih baik
+-- Fungsi SendMessageEMBED dengan logging
 function SendMessageEMBED(url, embed)
     if not url or url == "" then
-        warn("MuiHub WARNING: URL Webhook kosong. Tekan 'Apply' terlebih dahulu.")
+        addLog("WARNING: URL Webhook kosong. Tekan 'Apply' terlebih dahulu.")
         return false
     end
     
@@ -408,19 +459,16 @@ function SendMessageEMBED(url, embed)
         ["Content-Type"] = "application/json"
     }
     
-    -- Pastikan struktur embed sesuai format Discord, mirip old
     local embedData = {
         ["title"] = embed.title or "No Title",
         ["description"] = embed.description or "",
-        ["color"] = embed.color or 3447003, -- Biru sebagai contoh, mirip old
+        ["color"] = embed.color or 3447003,
     }
     
-    -- Tambahkan fields jika ada
     if embed.fields and #embed.fields > 0 then
         embedData["fields"] = embed.fields
     end
     
-    -- Tambahkan footer jika ada
     if embed.footer and embed.footer.text then
         embedData["footer"] = {
             ["text"] = embed.footer.text
@@ -433,7 +481,6 @@ function SendMessageEMBED(url, embed)
     
     local body = HttpService:JSONEncode(data)
     
-    -- Gunakan pcall untuk error handling, mirip old
     local success, response = pcall(function()
         return HttpService:RequestAsync({
             Url = url,
@@ -445,21 +492,22 @@ function SendMessageEMBED(url, embed)
     
     if success then
         if response.Success then
-            print("MuiHub: Embed sent successfully!")
+            addLog("Embed sent successfully!")
             return true
         else
-            warn("MuiHub WARNING: Failed to send embed. Status Code: " .. response.StatusCode)
-            warn("MuiHub WARNING: Response: " .. response.Body)
+            addLog("WARNING: Failed to send embed. Status Code: " .. response.StatusCode)
+            addLog("WARNING: Response: " .. response.Body)
             return false
         end
     else
-        warn("MuiHub WARNING: Error sending embed: " .. tostring(response))
+        addLog("WARNING: Error sending embed: " .. tostring(response))
         return false
     end
 end
 
--- Logika Test Button, mirip final tapi dengan template old
+-- Logika Test Button dengan logging
 TestButton.MouseButton1Click:Connect(function()
+    addLog("Test button clicked. Mengirim test embed...")
     local testEmbed = {
         title = "Perubahan Cuaca di Server Roblox",
         description = "Nilai 'Biome' telah berubah menjadi 'Test Biome'.",
@@ -476,17 +524,18 @@ TestButton.MouseButton1Click:Connect(function()
     local originalColor = TestButton.BackgroundColor3
     if success then
         TestButton.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
+        addLog("Test successful!")
     else
         TestButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        addLog("Test failed. Lihat log di atas untuk detail error.")
     end
     task.wait(2)
     TestButton.BackgroundColor3 = originalColor
 end)
 
--- Handler untuk event OnClientEvent, disesuaikan agar mirip "webhook old.lua"
+-- Handler untuk event OnClientEvent dengan logging
 if Event then
     Event.OnClientEvent:Connect(function(id, path, newValue)
-        -- Periksa jika path adalah array dan mengandung "BiomeName" atau "Biome", mirip old
         if typeof(path) == "table" then
             local isBiomeChange = false
             local keyMatched = ""
@@ -498,39 +547,44 @@ if Event then
                 end
             end
             
-            if isBiomeChange and (next(biomeWhitelist) == nil or biomeWhitelist[tostring(newValue)]) then  -- Jika whitelist kosong, selalu kirim; jika tidak, check whitelist
-                -- Buat embed notifikasi mirip old
-                local embed = {
-                    title = "Perubahan Cuaca di Server Roblox",
-                    description = string.format("Nilai '%s' telah berubah menjadi '%s'.", table.concat(path, "."), newValue),
-                    color = 3447003,
-                    fields = {
-                        {
-                            name = "Username: " .. (player.Name or "KeylaFitF9"),  -- Dinamis, fallback ke KeylaFitF9 seperti old
-                            value = tostring(id or "N/A"),
-                            inline = true
+            if isBiomeChange then
+                addLog("Biome change detected: Path=" .. table.concat(path, ", ") .. ", NewValue=" .. tostring(newValue))
+                if next(biomeWhitelist) == nil or biomeWhitelist[tostring(newValue)] then
+                    addLog("Whitelist match or no whitelist: Mengirim notifikasi...")
+                    local embed = {
+                        title = "Perubahan Cuaca di Server Roblox",
+                        description = string.format("Nilai '%s' telah berubah menjadi '%s'.", table.concat(path, "."), newValue),
+                        color = 3447003,
+                        fields = {
+                            {
+                                name = "Username: " .. (player.Name or "KeylaFitF9"),
+                                value = tostring(id or "N/A"),
+                                inline = true
+                            },
+                            {
+                                name = "Path",
+                                value = table.concat(path, ", "),
+                                inline = true
+                            },
+                            {
+                                name = "Nilai Baru",
+                                value = tostring(newValue),
+                                inline = true
+                            }
                         },
-                        {
-                            name = "Path",
-                            value = table.concat(path, ", "),
-                            inline = true
-                        },
-                        {
-                            name = "Nilai Baru",
-                            value = tostring(newValue),
-                            inline = true
+                        footer = {
+                            text = "Notifikasi dari Game Roblox"
                         }
-                    },
-                    footer = {
-                        text = "Notifikasi dari Game Roblox"
                     }
-                }
-                
-                -- Kirim ke Discord
-                SendMessageEMBED(appliedWebhookURL, embed)
+                    
+                    SendMessageEMBED(appliedWebhookURL, embed)
+                else
+                    addLog("Biome " .. tostring(newValue) .. " tidak di-whitelist. Tidak mengirim notifikasi.")
+                end
             end
         end
     end)
 end
 
-print("Script Webhook Biome oleh MuiHub (v5.1-Fixed) telah dimuat! Cek console untuk warning jika ada error.")
+addLog("Script dimuat. Versi 5.2 dengan Tab Log.")
+print("Script Webhook Biome oleh MuiHub (v5.2-LogTab) telah dimuat! Cek Tab Log untuk detail.")
