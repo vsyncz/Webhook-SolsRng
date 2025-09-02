@@ -1,13 +1,13 @@
 --[[
     Script: Webhook Biome Notifier
     Author: MuiHub (UI & Features by Gemini)
-    Version: 4.0 (Final Logic Rebuild)
+    Version: 5.0 (Back to Basics - Final)
     
     Deskripsi:
-    Versi final dengan logika pengiriman yang dirombak total sesuai permintaan.
-    - Mengimplementasikan fungsi SendMessageEMBED persis seperti yang diberikan pengguna.
-    - Menggunakan HttpService:RequestAsync sebagai metode pengiriman utama.
-    - Template notifikasi disesuaikan kembali agar sama persis dengan contoh.
+    Versi final dengan logika pengiriman yang dirombak total kembali ke dasar.
+    - Menggunakan fungsi SendMessageEMBED persis seperti dari skrip asli pengguna.
+    - Template notifikasi disesuaikan agar sama persis dengan contoh.
+    - Fungsionalitas Apply & Test dipertahankan.
 ]]
 
 --================================================================================
@@ -46,7 +46,7 @@ MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 MainFrame.BorderColor3 = Color3.fromRGB(80, 80, 80)
 MainFrame.BorderSizePixel = 1
 MainFrame.Position = UDim2.new(0.5, -210, 0.5, -175)
-MainFrame.Size = UDim2.new(0, 420, 0, 380) -- Ukuran disesuaikan sedikit
+MainFrame.Size = UDim2.new(0, 420, 0, 380)
 MainFrame.ClipsDescendants = true
 
 -- Header untuk judul dan tombol kontrol
@@ -55,7 +55,7 @@ Header.Name = "Header"
 Header.Parent = MainFrame
 Header.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 Header.Size = UDim2.new(1, 0, 0, 30)
-Header.Active = true -- Penting untuk menangkap input
+Header.Active = true
 
 -- Logika Geser (Drag) yang Sangat Halus
 local UserInputService = game:GetService("UserInputService")
@@ -140,7 +140,7 @@ BodyContainer.Size = UDim2.new(1, 0, 1, -30)
 local isMinimized = false
 MinimizeButton.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
-    BodyContainer.Visible = not isMinimized -- Sembunyikan/tampilkan seluruh konten
+    BodyContainer.Visible = not isMinimized
     if isMinimized then
         MainFrame:TweenSize(UDim2.new(0, 420, 0, 30), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
         MinimizeButton.Text = "+"
@@ -226,7 +226,6 @@ tabListLayout.Padding = UDim.new(0, 2)
 local webhookTabFrame = createTab("Webhook")
 
 -- Menambahkan elemen-elemen UI ke dalam frame tab Webhook
--- 1. Input Webhook
 local webhookInputLabel = Instance.new("TextLabel")
 webhookInputLabel.Parent = webhookTabFrame
 webhookInputLabel.LayoutOrder = 1
@@ -256,7 +255,6 @@ textPadding.Parent = webhookUrlBox
 textPadding.PaddingLeft = UDim.new(0, 8)
 textPadding.PaddingRight = UDim.new(0, 8)
 
--- Frame untuk menampung Tombol Apply & Test
 local buttonContainer = Instance.new("Frame")
 buttonContainer.Parent = webhookTabFrame
 buttonContainer.LayoutOrder = 3
@@ -271,7 +269,6 @@ buttonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 buttonLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 buttonLayout.Padding = UDim.new(0, 10)
 
--- Tombol Apply
 local ApplyButton = Instance.new("TextButton")
 ApplyButton.Name = "ApplyButton"
 ApplyButton.Parent = buttonContainer
@@ -282,7 +279,6 @@ ApplyButton.Text = "Apply"
 ApplyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ApplyButton.TextSize = 14
 
--- Tombol Test
 local TestButton = Instance.new("TextButton")
 TestButton.Name = "TestButton"
 TestButton.Parent = buttonContainer
@@ -296,24 +292,20 @@ TestButton.TextSize = 14
 ApplyButton.MouseButton1Click:Connect(function()
     local url = webhookUrlBox.Text
     local originalColor = ApplyButton.BackgroundColor3
-    
     if url:match("^https://discord.com/api/webhooks/") then
         appliedWebhookURL = url
         ApplyButton.Text = "Applied ✓"
         ApplyButton.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
-        task.wait(2)
     else
-        appliedWebhookURL = "" -- Kosongkan URL jika tidak valid
+        appliedWebhookURL = ""
         ApplyButton.Text = "Invalid"
         ApplyButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        task.wait(2)
     end
-    
+    task.wait(2)
     ApplyButton.Text = "Apply"
     ApplyButton.BackgroundColor3 = originalColor
 end)
 
--- 2. Daftar Centang Biome
 local biomeTitleLabel = Instance.new("TextLabel")
 biomeTitleLabel.Parent = webhookTabFrame
 biomeTitleLabel.LayoutOrder = 4
@@ -377,12 +369,11 @@ for _, biomeName in ipairs(availableBiomes) do
     end)
 end
 
--- Mengaktifkan tab pertama secara default setelah semua elemen dibuat
 tabs["Webhook"].button.MouseButton1Click:Invoke()
 
 
 --================================================================================
--- BAGIAN 2: LOGIKA WEBHOOK (REBUILT)
+-- BAGIAN 2: LOGIKA WEBHOOK (SEPERTI CONTOH ANDA)
 --================================================================================
 
 local HttpService = game:GetService("HttpService")
@@ -390,14 +381,15 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Event = ReplicatedStorage.ReplicaRemoteEvents.Replica_ReplicaSetValue
 local player = game.Players.LocalPlayer
 
--- PERBAIKAN FINAL: Menggunakan fungsi yang Anda berikan
 function SendMessageEMBED(url, embed)
-    if not url or not url:match("^https://discord.com/api/webhooks/") then
-        print("MuiHub: URL Webhook tidak valid atau kosong.")
+    if not url or url == "" then
+        print("MuiHub FATAL: URL Webhook kosong. Tekan 'Apply' terlebih dahulu.")
         return false
     end
-
-    local headers = { ["Content-Type"] = "application/json" }
+    
+    local headers = {
+        ["Content-Type"] = "application/json"
+    }
     
     local embedData = {
         ["title"] = embed.title or "No Title",
@@ -410,10 +402,15 @@ function SendMessageEMBED(url, embed)
     end
     
     if embed.footer and embed.footer.text then
-        embedData["footer"] = { ["text"] = embed.footer.text }
+        embedData["footer"] = {
+            ["text"] = embed.footer.text
+        }
     end
     
-    local data = { ["embeds"] = {embedData} }
+    local data = {
+        ["embeds"] = {embedData}
+    }
+    
     local body = HttpService:JSONEncode(data)
     
     local success, response = pcall(function()
@@ -430,12 +427,12 @@ function SendMessageEMBED(url, embed)
             print("MuiHub: Embed sent successfully!")
             return true
         else
-            print("MuiHub: Failed to send embed. Status Code: " .. response.StatusCode)
-            print("MuiHub: Response: " .. response.Body)
+            print("MuiHub: FAILED TO SEND. Status Code: " .. response.StatusCode)
+            print("MuiHub: Response Body: " .. response.Body)
             return false
         end
     else
-        print("MuiHub: Error sending embed: " .. tostring(response))
+        print("MuiHub: FATAL ERROR SENDING REQUEST: " .. tostring(response))
         return false
     end
 end
@@ -455,9 +452,9 @@ TestButton.MouseButton1Click:Connect(function()
     local success = SendMessageEMBED(appliedWebhookURL, testEmbed)
     local originalColor = TestButton.BackgroundColor3
     if success then
-        TestButton.BackgroundColor3 = Color3.fromRGB(80, 180, 100) -- Hijau
+        TestButton.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
     else
-        TestButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Merah
+        TestButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     end
     task.wait(2)
     TestButton.BackgroundColor3 = originalColor
