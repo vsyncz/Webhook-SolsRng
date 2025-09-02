@@ -1,12 +1,12 @@
 --[[
     Script: Webhook Biome Notifier
     Author: MuiHub (UI & Features by Gemini)
-    Version: 2.2
+    Version: 2.3
     
     Deskripsi:
     UI yang disempurnakan untuk notifikasi biome.
-    - Perbaikan fungsionalitas geser (drag) dengan implementasi manual yang lebih andal.
-    - Perbaikan masalah placeholder pada kotak input webhook.
+    - Implementasi logika geser (drag) yang sangat halus dan andal.
+    - Perbaikan bug tampilan saat UI di-minimize.
     - Tombol Minimize untuk menyembunyikan/menampilkan UI.
 ]]
 
@@ -55,29 +55,34 @@ Header.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 Header.Size = UDim2.new(1, 0, 0, 30)
 Header.Active = true -- Penting untuk menangkap input
 
--- Logika Geser (Drag) Manual yang Andal
+-- PERBAIKAN: Logika Geser (Drag) yang Sangat Halus
 local UserInputService = game:GetService("UserInputService")
-local dragging
+local RunService = game:GetService("RunService")
+local dragging = false
 local dragStart
 local startPos
+
 Header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
-        dragStart = input.Position
+        dragStart = UserInputService:GetMouseLocation()
         startPos = MainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
+        
+        local connection
+        connection = UserInputService.InputEnded:Connect(function(endInput)
+            if endInput.UserInputType == Enum.UserInputType.MouseButton1 or endInput.UserInputType == Enum.UserInputType.Touch then
                 dragging = false
+                connection:Disconnect()
             end
         end)
     end
 end)
-Header.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        if dragging then
-            local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
+
+RunService.Heartbeat:Connect(function()
+    if dragging then
+        local currentPos = UserInputService:GetMouseLocation()
+        local delta = currentPos - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
@@ -129,10 +134,11 @@ BodyContainer.BackgroundTransparency = 1
 BodyContainer.Position = UDim2.new(0, 0, 0, 30)
 BodyContainer.Size = UDim2.new(1, 0, 1, -30)
 
--- Logika untuk tombol minimize
+-- PERBAIKAN: Logika untuk tombol minimize
 local isMinimized = false
 MinimizeButton.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
+    BodyContainer.Visible = not isMinimized -- Sembunyikan/tampilkan seluruh konten
     if isMinimized then
         MainFrame:TweenSize(UDim2.new(0, 420, 0, 30), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
         MinimizeButton.Text = "+"
