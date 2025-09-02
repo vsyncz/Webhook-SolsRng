@@ -1,13 +1,13 @@
 --[[
     Script: Webhook Biome Notifier
     Author: MuiHub (UI & Features by Gemini)
-    Version: 3.1 (Final & Most Compatible)
+    Version: 4.0 (Final Logic Rebuild)
     
     Deskripsi:
-    Versi final dengan kompatibilitas maksimum.
-    - Menambahkan metode pengiriman ketiga (request) sebagai fallback.
-    - Template notifikasi diubah total agar sesuai dengan permintaan pengguna.
-    - Fungsionalitas Apply & Test yang telah teruji.
+    Versi final dengan logika pengiriman yang dirombak total sesuai permintaan.
+    - Mengimplementasikan fungsi SendMessageEMBED persis seperti yang diberikan pengguna.
+    - Menggunakan HttpService:RequestAsync sebagai metode pengiriman utama.
+    - Template notifikasi disesuaikan kembali agar sama persis dengan contoh.
 ]]
 
 --================================================================================
@@ -234,7 +234,7 @@ webhookInputLabel.Size = UDim2.new(1, 0, 0, 20)
 webhookInputLabel.BackgroundTransparency = 1
 webhookInputLabel.Font = Enum.Font.SourceSans
 webhookInputLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-webhookInputLabel.Text = "URL Webhook Discord:" -- Teks dikembalikan
+webhookInputLabel.Text = "URL Webhook Discord:"
 webhookInputLabel.TextSize = 14
 webhookInputLabel.TextXAlignment = Enum.TextXAlignment.Left
 
@@ -247,7 +247,7 @@ webhookUrlBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 webhookUrlBox.TextColor3 = Color3.fromRGB(220, 220, 220)
 webhookUrlBox.Font = Enum.Font.SourceSans
 webhookUrlBox.Text = ""
-webhookUrlBox.PlaceholderText = "Tempel URL webhook Anda di sini" -- Teks dikembalikan
+webhookUrlBox.PlaceholderText = "Tempel URL webhook Anda di sini"
 webhookUrlBox.ClearTextOnFocus = false
 webhookUrlBox.TextXAlignment = Enum.TextXAlignment.Left
 
@@ -382,7 +382,7 @@ tabs["Webhook"].button.MouseButton1Click:Invoke()
 
 
 --================================================================================
--- BAGIAN 2: LOGIKA WEBHOOK (FINAL)
+-- BAGIAN 2: LOGIKA WEBHOOK (REBUILT)
 --================================================================================
 
 local HttpService = game:GetService("HttpService")
@@ -390,56 +390,53 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Event = ReplicatedStorage.ReplicaRemoteEvents.Replica_ReplicaSetValue
 local player = game.Players.LocalPlayer
 
-function SendMessageEMBED(embed)
-    if not appliedWebhookURL:match("^https://discord.com/api/webhooks/") then
-        print("MuiHub: Tidak ada URL Webhook yang valid atau telah di-apply. Notifikasi dibatalkan.")
-        return false, "No valid URL"
+-- PERBAIKAN FINAL: Menggunakan fungsi yang Anda berikan
+function SendMessageEMBED(url, embed)
+    if not url or not url:match("^https://discord.com/api/webhooks/") then
+        print("MuiHub: URL Webhook tidak valid atau kosong.")
+        return false
     end
 
     local headers = { ["Content-Type"] = "application/json" }
+    
     local embedData = {
-        ["title"] = embed.title or "Tanpa Judul",
+        ["title"] = embed.title or "No Title",
         ["description"] = embed.description or "",
-        ["color"] = embed.color or 3447003, -- Biru default
-        ["fields"] = embed.fields or {},
-        ["footer"] = embed.footer or {}
+        ["color"] = embed.color or 3447003,
     }
+    
+    if embed.fields and #embed.fields > 0 then
+        embedData["fields"] = embed.fields
+    end
+    
+    if embed.footer and embed.footer.text then
+        embedData["footer"] = { ["text"] = embed.footer.text }
+    end
+    
     local data = { ["embeds"] = {embedData} }
     local body = HttpService:JSONEncode(data)
     
-    -- PERBAIKAN FINAL V2: Mencoba semua metode pengiriman yang mungkin
-    local success, response
-    if syn and syn.request then
-        print("MuiHub: Menggunakan metode pengiriman syn.request.")
-        success, response = pcall(function()
-            return syn.request({ Url = appliedWebhookURL, Method = "POST", Headers = headers, Body = body })
-        end)
-    elseif request then -- Fallback kedua untuk Krnl/Fluxus
-        print("MuiHub: syn.request gagal/tidak ada, mencoba metode 'request'.")
-        success, response = pcall(function()
-            return request({ Url = appliedWebhookURL, Method = "POST", Headers = headers, Body = body })
-        end)
-    else -- Fallback terakhir jika tidak ada yang lain
-        print("MuiHub: Tidak ada metode khusus, menggunakan HttpService bawaan.")
-        success, response = pcall(function()
-            return HttpService:RequestAsync({ Url = appliedWebhookURL, Method = "POST", Headers = headers, Body = body })
-        end)
-    end
-
+    local success, response = pcall(function()
+        return HttpService:RequestAsync({
+            Url = url,
+            Method = "POST",
+            Headers = headers,
+            Body = body
+        })
+    end)
+    
     if success then
-        local responseBody = type(response) == "table" and response.Body or tostring(response)
-        local responseCode = type(response) == "table" and response.StatusCode or "N/A"
-        
-        if responseCode == 204 or responseCode == 200 then
-            print("MuiHub: Notifikasi embed berhasil dikirim ke Discord!")
+        if response.Success then
+            print("MuiHub: Embed sent successfully!")
             return true
         else
-            print("MuiHub: GAGAL! Discord merespon dengan kode " .. responseCode .. ". Respon: " .. responseBody)
-            return false, "Discord API Error"
+            print("MuiHub: Failed to send embed. Status Code: " .. response.StatusCode)
+            print("MuiHub: Response: " .. response.Body)
+            return false
         end
     else
-        print("MuiHub: GAGAL TOTAL! Tidak bisa mengirim request. Error: " .. tostring(response))
-        return false, "Request Pcall Failed"
+        print("MuiHub: Error sending embed: " .. tostring(response))
+        return false
     end
 end
 
@@ -448,13 +445,14 @@ TestButton.MouseButton1Click:Connect(function()
         title = "Perubahan Cuaca di Server Roblox",
         description = "Nilai 'Biome' telah berubah menjadi 'Test Biome'.",
         fields = {
-            { name = "Username: " .. (player.Name or "Unknown"), value = player.UserId or "N/A", inline = true },
+            { name = "Username: " .. (player.Name or "Unknown"), value = tostring(player.UserId or "N/A"), inline = true },
             { name = "Path", value = "Biome", inline = true },
             { name = "Nilai Baru", value = "Test Biome", inline = true }
         },
         footer = { text = "Notifikasi dari Game Roblox" }
     }
-    local success, reason = SendMessageEMBED(testEmbed)
+    
+    local success = SendMessageEMBED(appliedWebhookURL, testEmbed)
     local originalColor = TestButton.BackgroundColor3
     if success then
         TestButton.BackgroundColor3 = Color3.fromRGB(80, 180, 100) -- Hijau
@@ -473,18 +471,18 @@ Event.OnClientEvent:Connect(function(id, path, newValue)
                     title = "Perubahan Cuaca di Server Roblox",
                     description = string.format("Nilai '%s' telah berubah menjadi '%s'.", key, newValue),
                     fields = {
-                        { name = "Username: " .. (player.Name or "Unknown"), value = id or "N/A", inline = true },
+                        { name = "Username: " .. (player.Name or "Unknown"), value = tostring(id or "N/A"), inline = true },
                         { name = "Path", value = key, inline = true },
                         { name = "Nilai Baru", value = newValue, inline = true }
                     },
                     footer = { text = "Notifikasi dari Game Roblox" }
                 }
-                SendMessageEMBED(embed)
+                SendMessageEMBED(appliedWebhookURL, embed)
                 break
             end
         end
     end
 end)
 
-print("Script Webhook Biome oleh MuiHub (vFinal-Compatible) telah dimuat!")
+print("Script Webhook Biome oleh MuiHub (vFinal-Rebuilt) telah dimuat!")
 
