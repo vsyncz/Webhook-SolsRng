@@ -1,12 +1,12 @@
 --[[
     Script: Webhook Biome Notifier
     Author: MuiHub (UI & Features by Gemini)
-    Version: 2.1
+    Version: 2.2
     
     Deskripsi:
     UI yang disempurnakan untuk notifikasi biome.
-    - Fungsionalitas geser (drag) dipastikan berfungsi pada header.
-    - Menghilangkan nama objek "TextBox" default yang mungkin muncul.
+    - Perbaikan fungsionalitas geser (drag) dengan implementasi manual yang lebih andal.
+    - Perbaikan masalah placeholder pada kotak input webhook.
     - Tombol Minimize untuk menyembunyikan/menampilkan UI.
 ]]
 
@@ -46,8 +46,6 @@ MainFrame.BorderSizePixel = 1
 MainFrame.Position = UDim2.new(0.5, -210, 0.5, -175)
 MainFrame.Size = UDim2.new(0, 420, 0, 350)
 MainFrame.ClipsDescendants = true
-MainFrame.Active = true
-MainFrame.Draggable = true -- MEMBUAT UI INI BISA DIGESER DENGAN MENEKAN DAN MENAHAN BAGIAN MANA SAJA (TERUTAMA HEADER)
 
 -- Header untuk judul dan tombol kontrol
 local Header = Instance.new("Frame")
@@ -55,6 +53,34 @@ Header.Name = "Header"
 Header.Parent = MainFrame
 Header.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 Header.Size = UDim2.new(1, 0, 0, 30)
+Header.Active = true -- Penting untuk menangkap input
+
+-- Logika Geser (Drag) Manual yang Andal
+local UserInputService = game:GetService("UserInputService")
+local dragging
+local dragStart
+local startPos
+Header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+Header.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if dragging then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end
+end)
+
 
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Name = "TitleLabel"
@@ -205,13 +231,14 @@ webhookInputLabel.TextSize = 14
 webhookInputLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 webhookUrlBox = Instance.new("TextBox")
-webhookUrlBox.Name = "WebhookURLInput" -- Perubahan: Memberi nama unik untuk menghindari tulisan "TextBox"
+webhookUrlBox.Name = "WebhookURLInput"
 webhookUrlBox.Parent = webhookTabFrame
 webhookUrlBox.LayoutOrder = 2
 webhookUrlBox.Size = UDim2.new(1, 0, 0, 30)
 webhookUrlBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 webhookUrlBox.TextColor3 = Color3.fromRGB(220, 220, 220)
 webhookUrlBox.Font = Enum.Font.SourceSans
+webhookUrlBox.Text = "" -- Perbaikan: Pastikan teks awal kosong
 webhookUrlBox.PlaceholderText = "Tempel URL webhook Anda di sini"
 webhookUrlBox.ClearTextOnFocus = false
 
