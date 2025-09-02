@@ -1,13 +1,12 @@
 --[[
     Script: Webhook Biome Notifier
     Author: MuiHub (UI & Features by Gemini)
-    Version: 3.0 (Final)
+    Version: 3.1 (Final & Most Compatible)
     
     Deskripsi:
-    Versi final dan paling andal.
-    - Menggunakan metode pengiriman webhook (syn.request) yang lebih kuat untuk mengatasi batasan eksekutor.
-    - Memberikan laporan error yang jauh lebih detail jika terjadi kegagalan.
-    - Teks UI dikembalikan seperti semula.
+    Versi final dengan kompatibilitas maksimum.
+    - Menambahkan metode pengiriman ketiga (request) sebagai fallback.
+    - Template notifikasi diubah total agar sesuai dengan permintaan pengguna.
     - Fungsionalitas Apply & Test yang telah teruji.
 ]]
 
@@ -389,6 +388,7 @@ tabs["Webhook"].button.MouseButton1Click:Invoke()
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Event = ReplicatedStorage.ReplicaRemoteEvents.Replica_ReplicaSetValue
+local player = game.Players.LocalPlayer
 
 function SendMessageEMBED(embed)
     if not appliedWebhookURL:match("^https://discord.com/api/webhooks/") then
@@ -400,37 +400,41 @@ function SendMessageEMBED(embed)
     local embedData = {
         ["title"] = embed.title or "Tanpa Judul",
         ["description"] = embed.description or "",
-        ["color"] = embed.color or 0,
+        ["color"] = embed.color or 3447003, -- Biru default
         ["fields"] = embed.fields or {},
         ["footer"] = embed.footer or {}
     }
     local data = { ["embeds"] = {embedData} }
     local body = HttpService:JSONEncode(data)
     
-    -- PERBAIKAN FINAL: Gunakan metode request yang lebih andal jika tersedia
+    -- PERBAIKAN FINAL V2: Mencoba semua metode pengiriman yang mungkin
     local success, response
     if syn and syn.request then
         print("MuiHub: Menggunakan metode pengiriman syn.request.")
         success, response = pcall(function()
             return syn.request({ Url = appliedWebhookURL, Method = "POST", Headers = headers, Body = body })
         end)
-    else
-        print("MuiHub: syn.request tidak ditemukan, menggunakan HttpService bawaan.")
+    elseif request then -- Fallback kedua untuk Krnl/Fluxus
+        print("MuiHub: syn.request gagal/tidak ada, mencoba metode 'request'.")
+        success, response = pcall(function()
+            return request({ Url = appliedWebhookURL, Method = "POST", Headers = headers, Body = body })
+        end)
+    else -- Fallback terakhir jika tidak ada yang lain
+        print("MuiHub: Tidak ada metode khusus, menggunakan HttpService bawaan.")
         success, response = pcall(function()
             return HttpService:RequestAsync({ Url = appliedWebhookURL, Method = "POST", Headers = headers, Body = body })
         end)
     end
 
-    -- PERBAIKAN: Berikan Laporan Error yang Jelas
     if success then
         local responseBody = type(response) == "table" and response.Body or tostring(response)
-        local responseSuccess = type(response) == "table" and response.Success or (responseBody and not responseBody:find("error"))
+        local responseCode = type(response) == "table" and response.StatusCode or "N/A"
         
-        if responseSuccess then
+        if responseCode == 204 or responseCode == 200 then
             print("MuiHub: Notifikasi embed berhasil dikirim ke Discord!")
             return true
         else
-            print("MuiHub: GAGAL! Discord merespon dengan error. Respon: " .. responseBody)
+            print("MuiHub: GAGAL! Discord merespon dengan kode " .. responseCode .. ". Respon: " .. responseBody)
             return false, "Discord API Error"
         end
     else
@@ -441,10 +445,14 @@ end
 
 TestButton.MouseButton1Click:Connect(function()
     local testEmbed = {
-        title = "Pesan Uji Coba dari MuiHub",
-        description = "Jika Anda melihat pesan ini, artinya webhook Anda berfungsi dengan benar!",
-        color = 8311585, -- Hijau
-        footer = { text = "MuiHub Notifier | Test Message" }
+        title = "Perubahan Cuaca di Server Roblox",
+        description = "Nilai 'Biome' telah berubah menjadi 'Test Biome'.",
+        fields = {
+            { name = "Username: " .. (player.Name or "Unknown"), value = player.UserId or "N/A", inline = true },
+            { name = "Path", value = "Biome", inline = true },
+            { name = "Nilai Baru", value = "Test Biome", inline = true }
+        },
+        footer = { text = "Notifikasi dari Game Roblox" }
     }
     local success, reason = SendMessageEMBED(testEmbed)
     local originalColor = TestButton.BackgroundColor3
@@ -462,14 +470,14 @@ Event.OnClientEvent:Connect(function(id, path, newValue)
         for _, key in ipairs(path) do
             if (key == "BiomeName" or key == "Biome") and biomeWhitelist[tostring(newValue)] then
                 local embed = {
-                    title = "Perubahan Biome Terdeteksi",
-                    description = string.format("Biome di server telah berubah menjadi **%s**.", newValue),
-                    color = 3447003, -- Biru
+                    title = "Perubahan Cuaca di Server Roblox",
+                    description = string.format("Nilai '%s' telah berubah menjadi '%s'.", key, newValue),
                     fields = {
-                        { name = "Username", value = tostring(game.Players.LocalPlayer.Name or "Tidak ditemukan"), inline = true },
-                        { name = "Biome Baru", value = tostring(newValue), inline = true }
+                        { name = "Username: " .. (player.Name or "Unknown"), value = id or "N/A", inline = true },
+                        { name = "Path", value = key, inline = true },
+                        { name = "Nilai Baru", value = newValue, inline = true }
                     },
-                    footer = { text = "MuiHub Notifier | " .. os.date("!%Y-%m-%d %H:%M:%S UTC") }
+                    footer = { text = "Notifikasi dari Game Roblox" }
                 }
                 SendMessageEMBED(embed)
                 break
@@ -478,5 +486,5 @@ Event.OnClientEvent:Connect(function(id, path, newValue)
     end
 end)
 
-print("Script Webhook Biome oleh MuiHub (vFinal) telah dimuat!")
+print("Script Webhook Biome oleh MuiHub (vFinal-Compatible) telah dimuat!")
 
